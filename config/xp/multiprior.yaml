@@ -72,7 +72,7 @@ trainer:
   logger:
     _target_: pytorch_lightning.loggers.CSVLogger
     save_dir: ${hydra:runtime.output_dir}
-    name: ${hydra:runtime.choices.xp}
+    name: ''
     version: ''
   max_epochs: 300
   callbacks:
