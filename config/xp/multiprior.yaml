@@ -85,7 +85,7 @@ trainer:
 
 
 entrypoints:
-  - _target_: lightning_lite.utilities.seed.seed_everything
+  - _target_: pytorch_lightning.seed_everything
     _args_:
     - 333
   - _target_: contrib.multiprior.multiprior_train
