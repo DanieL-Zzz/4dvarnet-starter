@@ -1,6 +1,8 @@
 entrypoints: ???
 hydra:
-  searchpath: 
+  run:
+    dir: ./outputs/${hydra:runtime.choices.xp}/${now:%Y-%m-%d-%Hh%Mmin%S}
+  searchpath:
     - pkg://config
     - pkg://contrib
 defaults:
