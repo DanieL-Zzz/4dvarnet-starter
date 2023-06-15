@@ -14,14 +14,21 @@ MultiPriorTrainingItem = collections.namedtuple(
     'MultiPriorTrainingItem', ['input', 'tgt', 'lat', 'lon']
 )
 
-def multiprior_train(trainer, model, dm, test_domain):
+def multiprior_entrypoint(trainer, model, dm, test_domain, ckpt=None):
+    """
+    Specifying the parameter `ckpt` with the path to a checkpoint file
+    will trigger the test mode.
+    Otherwise, if `ckpt` is not specified, there will be a full training
+    and then a testing on the best generated checkpoint.
+    """
     print()
     print(trainer.logger.log_dir)
     print()
 
-    trainer.fit(model, dm)
-    best_ckpt_path = trainer.checkpoint_callback.best_model_path
-    src.utils.test_osse(trainer, model, dm, test_domain, best_ckpt_path)
+    if not ckpt:
+        trainer.fit(model, dm)
+        ckpt = trainer.checkpoint_callback.best_model_path
+    src.utils.test_osse(trainer, model, dm, test_domain, ckpt)
 
 def load_data_with_lat_lon(
     inp_path, gt_path, obs_var='five_nadirs', train_domain=None,
