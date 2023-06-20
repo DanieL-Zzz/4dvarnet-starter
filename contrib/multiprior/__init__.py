@@ -2,6 +2,7 @@ import collections
 import functools as ft
 
 import einops
+import hydra
 import torch
 import torch.nn as nn
 import xarray as xr
@@ -56,6 +57,53 @@ def load_data_with_lat_lon(
     ).transpose('time', 'lat', 'lon').to_array()
 
 
+class MultiPriorLitModel(src.models.Lit4dVarNet):
+    def test_step(self, batch, batch_idx):
+        if batch_idx == 0:
+            self.test_data = []
+        out = self(batch=batch)
+        m, s = self.norm_stats
+
+        _priors, _weights = self.solver.prior_cost.detailed_outputs(
+            (out, torch.stack((batch.lat[:,0], batch.lon[:,0]), dim=1))
+        )
+
+        # Make sure priors' outputs and weights have the same channel
+        _repeat = lambda x: einops.repeat(
+            x, 'b c h w -> b (repeat c) h w', repeat=_priors[0].shape[1],
+        )
+
+        _tensors = []
+        _tensors.extend([
+            batch.input.cpu() * s + m,
+            batch.tgt.cpu() * s + m,
+            out.squeeze(dim=-1).detach().cpu() * s + m,
+        ])
+        _tensors.extend(t.cpu() for t in _priors)
+        _tensors.extend(_repeat(w).cpu() for w in _weights)
+
+        self.test_data.append(torch.stack(_tensors, dim=1))
+
+    def on_test_epoch_end(self):
+        rec_da = self.trainer.test_dataloaders.dataset.reconstruct(
+            self.test_data, self.rec_weight.cpu().numpy()
+        )
+        if isinstance(rec_da, list):
+            rec_da = rec_da[0]
+
+        n_priors = len(self.solver.prior_cost.prior_costs)
+        legend = ["obs", "ssh", "rec_ssh"]
+        legend.extend([f'phi{k}_out' for k in range(n_priors)])
+        legend.extend([f'phi{k}_weight' for k in range(n_priors)])
+
+        self.test_data = xr.Dataset({
+            k: rec_da.isel(v0=i) for i, k in enumerate(legend)
+        })
+
+        if self.test_data:
+            self.test_data.to_netcdf(f'{self.logger.log_dir}/test.nc')
+
+
 class MultiPriorDataModule(src.data.BaseDataModule):
     def get_train_range(self, v):
         train_data = self.input_da.sel(self.xrds_kw.get('domain_limits', {})).sel(
@@ -95,8 +143,20 @@ class MultiPriorCost(nn.Module):
         phi_weis = torch.softmax(
             torch.stack([wei(coords, i) for i, wei in enumerate(self.weight_mods)], dim=0), dim=0
         )
-        phi_out = ( phi_outs * phi_weis ).sum(0)
+        phi_out = (phi_outs * phi_weis).sum(0)
         return phi_out
+
+    @torch.no_grad()
+    def detailed_outputs(self, state):
+        x, coords = state
+
+        phi_outs = [phi.forward_ae(x) for phi in self.prior_costs]
+        _weights = torch.softmax(
+            torch.stack([wei(coords, i) for i, wei in enumerate(self.weight_mods)], dim=0), dim=0
+        )
+        phi_weis = [_weights[i] for i in range(_weights.shape[0])]
+
+        return phi_outs, phi_weis
 
     def forward(self, state):
         return nn.functional.mse_loss(state[0], self.forward_ae(state))
@@ -149,9 +209,8 @@ class WeightMod(nn.Module):
         super().__init__()
         self.downsamp = 5
         self.net = nn.Sequential(
-            nn.Conv2d(2, 16, 1),
-            nn.ReLU(),
-            nn.Conv2d(16, 1, 1),
+            nn.Conv2d(2, 1, 7, padding=3),
+            nn.Sigmoid()
         )
 
 
