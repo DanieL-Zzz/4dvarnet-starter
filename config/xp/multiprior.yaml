@@ -29,7 +29,7 @@ datamodule:
     aug_factor: 5
 
 model:
-  _target_: src.models.Lit4dVarNet
+  _target_: contrib.multiprior.MultiPriorLitModel
   opt_fn:
     _target_: src.utils.cosanneal_lr_adam
     _partial_: true
