@@ -2,7 +2,6 @@ import collections
 import functools as ft
 
 import einops
-import hydra
 import torch
 import torch.nn as nn
 import xarray as xr
@@ -30,6 +29,13 @@ def multiprior_entrypoint(trainer, model, dm, test_domain, ckpt=None):
         trainer.fit(model, dm)
         ckpt = trainer.checkpoint_callback.best_model_path
     src.utils.test_osse(trainer, model, dm, test_domain, ckpt)
+
+    # Save test data
+    if hasattr(model, 'test_data'):
+        _netcdf_path = f'{model.logger.log_dir}/test.nc'
+        model.test_data.sel(test_domain).to_netcdf(_netcdf_path)
+        print(f'Intermediate data stored at {_netcdf_path}')
+
 
 def load_data_with_lat_lon(
     inp_path, gt_path, obs_var='five_nadirs', train_domain=None,
@@ -99,9 +105,6 @@ class MultiPriorLitModel(src.models.Lit4dVarNet):
         self.test_data = xr.Dataset({
             k: rec_da.isel(v0=i) for i, k in enumerate(legend)
         })
-
-        if self.test_data:
-            self.test_data.to_netcdf(f'{self.logger.log_dir}/test.nc')
 
 
 class MultiPriorDataModule(src.data.BaseDataModule):
@@ -205,23 +208,15 @@ class BinWeightMod(nn.Module):
 
 
 class WeightMod(nn.Module):
-    def __init__(self):
+    def __init__(self, resize_factor=5):
         super().__init__()
-        self.downsamp = 5
         self.net = nn.Sequential(
+            nn.AvgPool2d(resize_factor),
             nn.Conv2d(2, 1, 7, padding=3),
-            nn.Sigmoid()
-        )
+            nn.Upsample(scale_factor=resize_factor, mode='bilinear'),
 
+            nn.Sigmoid(),
+        )
 
     def forward(self, x, *args, **kwargs):
-        x = einops.reduce(
-            x,
-            'b c (rlat lat) ( rlon lon) -> b c lat lon',
-            'mean',
-            rlat=self.downsamp,
-            rlon=self.downsamp,
-        )
-        x = self.net(x)
-        x = nn.functional.interpolate(x, scale_factor=self.downsamp, mode='bilinear')
-        return x
+        return self.net(x)
