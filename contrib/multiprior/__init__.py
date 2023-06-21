@@ -98,7 +98,7 @@ class MultiPriorLitModel(src.models.Lit4dVarNet):
             rec_da = rec_da[0]
 
         n_priors = len(self.solver.prior_cost.prior_costs)
-        legend = ["obs", "ssh", "rec_ssh"]
+        legend = ["obs", "ssh", "out"]
         legend.extend([f'phi{k}_out' for k in range(n_priors)])
         legend.extend([f'phi{k}_weight' for k in range(n_priors)])
 
