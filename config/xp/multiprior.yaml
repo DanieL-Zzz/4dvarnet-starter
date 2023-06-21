@@ -1,11 +1,8 @@
 # @package _global_
 
-path:  # IMT paths
-  input: '/DATASET/NATL/cal_data_new_errs.nc'
-  gt: '/DATASET/NATL/NATL60-CJM165_NATL_ssh_y2013.1y.nc'
-
-max_epochs: 1  # 300
+entrypoint: contrib.multiprior.train
 checkpoint: null
+max_epochs: 300
 
 datamodule:
   _target_: contrib.multiprior.latlon.MultiPriorDataModule
@@ -116,14 +113,14 @@ trainer:
     - _target_: src.versioning_cb.VersioningCallback
     - _target_: pytorch_lightning.callbacks.LearningRateMonitor
     - _target_: pytorch_lightning.callbacks.ModelCheckpoint
-      monitor: val_rmse
+      monitor: val_mse
       save_top_k: 10
-      filename: '{val_rmse:.4f}-{epoch:03d}'
+      filename: '{val_mse:.4f}-{epoch:03d}'
 
 entrypoints:
   - _target_: pytorch_lightning.seed_everything
     seed: 333
-  - _target_: contrib.multiprior.train
+  - _target_: ${entrypoint}
     trainer: ${trainer}
     model: ${model}
     dm: ${datamodule}
@@ -131,4 +128,5 @@ entrypoints:
 
 defaults:
 - /domain: gf
+- /_LOCAL_path  # Must contain `path: {'input': ..., 'gt': ...}`
 - _self_

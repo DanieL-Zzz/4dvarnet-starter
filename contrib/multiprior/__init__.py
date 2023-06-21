@@ -12,7 +12,7 @@ import src.utils
 
 def train(trainer, model, dm, ckpt=None):
     print()
-    print('Train', trainer.logger.log_dir)
+    print('Train and test', trainer.logger.log_dir)
     print()
 
     trainer.fit(model, dm, ckpt_path=ckpt)
@@ -20,7 +20,7 @@ def train(trainer, model, dm, ckpt=None):
 
 def test(trainer, model, dm, ckpt):
     print()
-    print('Train', trainer.logger.log_dir)
+    print('Test', trainer.logger.log_dir)
     print()
 
     trainer.test(model, datamodule=dm, ckpt_path=ckpt)
@@ -40,7 +40,7 @@ class MultiPriorLitModel(src.models.Lit4dVarNet):
         m, s = self.norm_stats
 
         _input = out
-        if latlon:
+        if latlon is not None:
             _input = (out, latlon)
 
         _priors, _weights = self.solver.prior_cost.detailed_outputs(_input)
@@ -69,7 +69,7 @@ class MultiPriorLitModel(src.models.Lit4dVarNet):
             rec_da = rec_da[0]
 
         n_priors = len(self.solver.prior_cost.prior_costs)
-        legend = ["obs", "ssh", "out"]
+        legend = ['inp', 'tgt', 'out']  # Somethings is wrong here
         legend.extend([f'phi{k}_out' for k in range(n_priors)])
         legend.extend([f'phi{k}_weight' for k in range(n_priors)])
 
@@ -77,7 +77,7 @@ class MultiPriorLitModel(src.models.Lit4dVarNet):
             dict(v0=legend)
         ).to_dataset(dim='v0')
 
-        metric_data = self.test_data.pipe(self.pre_metric_fn)
+        metric_data = self.test_data[legend[:3]].pipe(self.pre_metric_fn)
         metrics = pd.Series({
             metric_n: metric_fn(metric_data)
             for metric_n, metric_fn in self.metrics.items()
@@ -86,7 +86,11 @@ class MultiPriorLitModel(src.models.Lit4dVarNet):
         print(metrics.to_frame(name="Metrics").to_markdown())
 
         if self.logger:
-            self.test_data.to_netcdf(Path(self.logger.log_dir) / 'test_data.nc')
+            (
+                self.test_data
+                .pipe(self.pre_metric_fn)
+                .to_netcdf(Path(self.logger.log_dir) / 'test_data.nc')
+            )
             self.logger.log_metrics(metrics.to_dict())
 
 

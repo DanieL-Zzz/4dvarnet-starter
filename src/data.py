@@ -19,7 +19,7 @@ class XrDataset(torch.utils.data.Dataset):
     """
     torch Dataset based on an xarray.DataArray with on the fly slicing.
 
-    ### Usage: #### 
+    ### Usage: ####
     If you want to be able to reconstruct the input
 
     the input xr.DataArray should:
@@ -37,7 +37,7 @@ class XrDataset(torch.utils.data.Dataset):
             ):
         """
         da: xarray.DataArray with patch dims at the end in the dim orders
-        patch_dims: dict of da dimension to size of a patch 
+        patch_dims: dict of da dimension to size of a patch
         domain_limits: dict of da dimension to slices of domain to select for patch extractions
         strides: dict of dims to stride size (default to one)
         check_full_scan: Boolean: if True raise an error if the whole domain is not scanned by the patch size stride combination
@@ -70,10 +70,10 @@ class XrDataset(torch.utils.data.Dataset):
 
         if check_dim_order:
             for dim in patch_dims:
-                if not '#'.join(da.dims).endswith('#'.join(list(patch_dims))): 
+                if not '#'.join(da.dims).endswith('#'.join(list(patch_dims))):
                     raise DangerousDimOrdering(
                         f"""
-                        input dataarray's dims should end with patch_dims 
+                        input dataarray's dims should end with patch_dims
                         dataarray's dim {da.dims}:
                         patch_dims {list(patch_dims)}
                         """
@@ -122,7 +122,7 @@ class XrDataset(torch.utils.data.Dataset):
 
     batches: list of torch tensor correspondin to batches without shuffle
         weight: tensor of size patch_dims corresponding to the weight of a prediction depending on the position on the patch (default to ones everywhere)
-        overlapping patches will be averaged with weighting 
+        overlapping patches will be averaged with weighting
         """
 
         items = list(itertools.chain(*batches))
@@ -147,7 +147,7 @@ class XrDataset(torch.utils.data.Dataset):
         rec_da = xr.DataArray(
                 np.zeros([*new_shape.values(), *da_shape.values()]),
                 dims=dims,
-                coords={d: self.da[d] for d in self.patch_dims} 
+                coords={d: self.da[d] for d in self.patch_dims}
         )
         count_da = xr.zeros_like(rec_da)
 
@@ -170,7 +170,7 @@ class XrConcatDataset(torch.utils.data.ConcatDataset):
         for ds in self.datasets:
             ds_items = list(itertools.islice(items_iter, len(ds)))
             rec_das.append(ds.reconstruct_from_items(ds_items, weight))
-    
+
         return rec_das
 
 class AugmentedDataset(torch.utils.data.Dataset):
@@ -195,7 +195,7 @@ class AugmentedDataset(torch.utils.data.Dataset):
         perm_idx = tgt_idx
         for _ in range(idx // len(self.inp_ds)):
             perm_idx = self.perm[perm_idx]
-        
+
         item = self.inp_ds[tgt_idx]
         perm_item = self.inp_ds[perm_idx]
 
@@ -224,7 +224,6 @@ class BaseDataModule(pl.LightningDataModule):
     def norm_stats(self):
         if self._norm_stats is None:
             self._norm_stats = self.train_mean_std()
-            print("Norm stats", self._norm_stats)
         return self._norm_stats
 
     def train_mean_std(self, variable='tgt'):
