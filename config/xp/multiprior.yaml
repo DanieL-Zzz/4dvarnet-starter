@@ -4,13 +4,13 @@ path:  # IMT paths
   input: '/DATASET/NATL/cal_data_new_errs.nc'
   gt: '/DATASET/NATL/NATL60-CJM165_NATL_ssh_y2013.1y.nc'
 
-max_epochs: 300
+max_epochs: 1  # 300
 checkpoint: null
 
 datamodule:
-  _target_: contrib.multiprior.MultiPriorDataModule
+  _target_: contrib.multiprior.latlon.MultiPriorDataModule
   input_da:
-    _target_: contrib.multiprior.load_data_with_lat_lon
+    _target_: contrib.multiprior.latlon.load_data_with_lat_lon
     inp_path: ${path.input}
     gt_path: ${path.gt}
     train_domain: ${domain.train}
@@ -30,7 +30,7 @@ datamodule:
     aug_factor: 5
 
 model:
-  _target_: contrib.multiprior.MultiPriorLitModel
+  _target_: contrib.multiprior.latlon.MultiPriorLitModel
   opt_fn:
     _target_: src.utils.cosanneal_lr_adam
     _partial_: true
@@ -42,7 +42,7 @@ model:
       crop: {time: 0, lat: 20, lon: 20}
       offset: 0
   solver:
-    _target_: contrib.multiprior.MultiPriorGradSolver
+    _target_: contrib.multiprior.latlon.MultiPriorGradSolver
     n_step: 15
     lr_grad: 0.2
     prior_cost:
@@ -65,10 +65,44 @@ model:
       _target_: src.models.ConvLstmGradModel
       dim_in: ${datamodule.xrds_kw.patch_dims.time}
       dim_hidden: 96
+  test_metrics: ${metrics.test_metrics}
+  pre_metric_fn:
+    _target_: xarray.Dataset.sel
+    _partial_: true
+    time: {_target_: builtins.slice, _args_: ['2012-10-22', '2012-12-02']}
+    lat: ${domain.test.lat}
+    lon: ${domain.test.lon}
+
+metrics:
+  nrmse_scores:
+    _target_: src.utils.rmse_based_scores_from_ds
+    _partial_: true
+  psd_scores:
+    _target_: src.utils.psd_based_scores_from_ds
+    _partial_: true
+  get0: {_target_: operator.itemgetter, _args_: [0]}
+  get1: {_target_: operator.itemgetter, _args_: [1]}
+  test_metrics:
+    mu:
+      _target_: src.utils.pipe
+      _partial_: true
+      fns: ['${metrics.nrmse_scores}', '${metrics.get0}']
+    sig:
+      _target_: src.utils.pipe
+      _partial_: true
+      fns: ['${metrics.nrmse_scores}', '${metrics.get1}']
+    lx:
+      _target_: src.utils.pipe
+      _partial_: true
+      fns: ['${metrics.psd_scores}', '${metrics.get0}']
+    lt:
+      _target_: src.utils.pipe
+      _partial_: true
+      fns: ['${metrics.psd_scores}', '${metrics.get1}']
 
 trainer:
   _target_: pytorch_lightning.Trainer
-  inference_mode: False
+  inference_mode: false
   gradient_clip_val: 0.5
   accelerator: gpu
   devices: 1
@@ -86,19 +120,13 @@ trainer:
       save_top_k: 10
       filename: '{val_rmse:.4f}-{epoch:03d}'
 
-
 entrypoints:
   - _target_: pytorch_lightning.seed_everything
-    _args_:
-    - 333
-  - _target_: contrib.multiprior.multiprior_entrypoint
+    seed: 333
+  - _target_: contrib.multiprior.train
     trainer: ${trainer}
     model: ${model}
     dm: ${datamodule}
-    test_domain:
-      time: {_target_: builtins.slice, _args_: ["2012-10-22", "2012-12-02"]}
-      lat: ${domain.test.lat}
-      lon: ${domain.test.lon}
     ckpt: ${checkpoint}
 
 defaults:

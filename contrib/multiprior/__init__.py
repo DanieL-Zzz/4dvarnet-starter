@@ -1,78 +1,49 @@
 import collections
-import functools as ft
+from pathlib import Path
 
 import einops
+import pandas as pd
 import torch
 import torch.nn as nn
-import xarray as xr
 
 import src.data
 import src.models
 import src.utils
 
-MultiPriorTrainingItem = collections.namedtuple(
-    'MultiPriorTrainingItem', ['input', 'tgt', 'lat', 'lon']
-)
-
-def multiprior_entrypoint(trainer, model, dm, test_domain, ckpt=None):
-    """
-    Specifying the parameter `ckpt` with the path to a checkpoint file
-    will trigger the test mode.
-    Otherwise, if `ckpt` is not specified, there will be a full training
-    and then a testing on the best generated checkpoint.
-    """
+def train(trainer, model, dm, ckpt=None):
     print()
-    print(trainer.logger.log_dir)
+    print('Train', trainer.logger.log_dir)
     print()
 
-    if not ckpt:
-        trainer.fit(model, dm)
-        ckpt = trainer.checkpoint_callback.best_model_path
-    src.utils.test_osse(trainer, model, dm, test_domain, ckpt)
+    trainer.fit(model, dm, ckpt_path=ckpt)
+    trainer.test(model, datamodule=dm, ckpt_path='best')
 
-    # Save test data
-    if hasattr(model, 'test_data'):
-        _netcdf_path = f'{model.logger.log_dir}/test.nc'
-        model.test_data.sel(test_domain).to_netcdf(_netcdf_path)
-        print(f'Intermediate data stored at {_netcdf_path}')
+def test(trainer, model, dm, ckpt):
+    print()
+    print('Train', trainer.logger.log_dir)
+    print()
 
-
-def load_data_with_lat_lon(
-    inp_path, gt_path, obs_var='five_nadirs', train_domain=None,
-):
-    inp = xr.open_dataset(inp_path)[obs_var]
-    gt = (
-        xr.open_dataset(gt_path)
-        .ssh.isel(time=slice(0, -1))
-        .interp(lat=inp.lat, lon=inp.lon, method='nearest')
-    )
-
-    ds =  xr.Dataset(dict(input=inp, tgt=(gt.dims, gt.values)), inp.coords)
-
-    if train_domain is not None:
-        ds = ds.sel(train_domain)
-
-    return xr.Dataset(
-        dict(
-            input=ds.input,
-            tgt=src.utils.remove_nan(ds.tgt),
-            latv=ds.lat.broadcast_like(ds.tgt),
-            lonv=ds.lon.broadcast_like(ds.tgt),
-        ),
-        ds.coords,
-    ).transpose('time', 'lat', 'lon').to_array()
+    trainer.test(model, datamodule=dm, ckpt_path=ckpt)
 
 
 class MultiPriorLitModel(src.models.Lit4dVarNet):
-    def test_step(self, batch, batch_idx):
+    def test_step(self, batch, batch_idx, latlon=None):
+        """
+        If `_input` is specified, add its value as input to MultiPrior
+        along with the output of the solver.
+
+        Used solely for latitude and longitude.
+        """
         if batch_idx == 0:
             self.test_data = []
         out = self(batch=batch)
         m, s = self.norm_stats
 
-        _priors, _weights = self.solver.prior_cost.detailed_outputs(
-            (out, torch.stack((batch.lat[:,0], batch.lon[:,0]), dim=1))
-        )
+        _input = out
+        if latlon:
+            _input = (out, latlon)
+
+        _priors, _weights = self.solver.prior_cost.detailed_outputs(_input)
 
         # Make sure priors' outputs and weights have the same channel
         _repeat = lambda x: einops.repeat(
@@ -85,7 +56,7 @@ class MultiPriorLitModel(src.models.Lit4dVarNet):
             batch.tgt.cpu() * s + m,
             out.squeeze(dim=-1).detach().cpu() * s + m,
         ])
-        _tensors.extend(t.cpu() for t in _priors)
+        _tensors.extend(p.cpu() for p in _priors)
         _tensors.extend(_repeat(w).cpu() for w in _weights)
 
         self.test_data.append(torch.stack(_tensors, dim=1))
@@ -102,34 +73,25 @@ class MultiPriorLitModel(src.models.Lit4dVarNet):
         legend.extend([f'phi{k}_out' for k in range(n_priors)])
         legend.extend([f'phi{k}_weight' for k in range(n_priors)])
 
-        self.test_data = xr.Dataset({
-            k: rec_da.isel(v0=i) for i, k in enumerate(legend)
+        self.test_data = rec_da.assign_coords(
+            dict(v0=legend)
+        ).to_dataset(dim='v0')
+
+        metric_data = self.test_data.pipe(self.pre_metric_fn)
+        metrics = pd.Series({
+            metric_n: metric_fn(metric_data)
+            for metric_n, metric_fn in self.metrics.items()
         })
+
+        print(metrics.to_frame(name="Metrics").to_markdown())
+
+        if self.logger:
+            self.test_data.to_netcdf(Path(self.logger.log_dir) / 'test_data.nc')
+            self.logger.log_metrics(metrics.to_dict())
 
 
 class MultiPriorDataModule(src.data.BaseDataModule):
-    def get_train_range(self, v):
-        train_data = self.input_da.sel(self.xrds_kw.get('domain_limits', {})).sel(
-            self.domains['train']
-        )
-        return train_data[v].min().values.item(), train_data[v].max().values.item()
-
-    def post_fn(self):
-        normalize = lambda item: (item - self.norm_stats()[0]) / self.norm_stats()[1]
-        lat_r = self.get_train_range('lat')
-        lon_r = self.get_train_range('lon')
-        minmax_scale = lambda l, r: 2 * (l - r[0]) / (r[1] - r[0]) - 1.
-        return ft.partial(
-            ft.reduce,
-            lambda i, f: f(i),
-            [
-                MultiPriorTrainingItem._make,
-                lambda item: item._replace(tgt=normalize(item.tgt)),
-                lambda item: item._replace(input=normalize(item.input)),
-                lambda item: item._replace(lat=minmax_scale(item.lat, lat_r)),
-                lambda item: item._replace(lon=minmax_scale(item.lon, lon_r)),
-            ],
-        )
+    pass
 
 
 class MultiPriorCost(nn.Module):
@@ -141,7 +103,11 @@ class MultiPriorCost(nn.Module):
         )
 
     def forward_ae(self, state):
-        x, coords = state
+        if isinstance(state, collections.abc.Iterable):  # Latitude, longitude
+            x, coords = state
+        else:
+            x, coords = state, state
+
         phi_outs = torch.stack([phi.forward_ae(x) for phi in self.prior_costs], dim=0)
         phi_weis = torch.softmax(
             torch.stack([wei(coords, i) for i, wei in enumerate(self.weight_mods)], dim=0), dim=0
@@ -151,7 +117,10 @@ class MultiPriorCost(nn.Module):
 
     @torch.no_grad()
     def detailed_outputs(self, state):
-        x, coords = state
+        if isinstance(state, collections.abc.Iterable):  # Latitude, longitude
+            x, coords = state
+        else:
+            x, coords = state, state
 
         phi_outs = [phi.forward_ae(x) for phi in self.prior_costs]
         _weights = torch.softmax(
@@ -166,45 +135,7 @@ class MultiPriorCost(nn.Module):
 
 
 class MultiPriorGradSolver(src.models.GradSolver):
-    def init_state(self, batch, x_init=None):
-        x_init = super().init_state(batch, x_init)
-        coords = torch.stack((batch.lat[:,0], batch.lon[:,0]), dim=1)
-        return (x_init, coords)
-
-    def solver_step(self, state, batch, step):
-        var_cost = self.prior_cost(state) + self.obs_cost(state[0], batch)
-        x, coords = state
-        grad = torch.autograd.grad(var_cost, x, create_graph=True)[0]
-
-        x_update = (
-            1 / (step + 1) * self.grad_mod(grad)
-            + self.lr_grad * (step + 1) / self.n_step * grad
-        )
-        state = (x - x_update, coords)
-        return state
-
-    def forward(self, batch):
-        with torch.set_grad_enabled(True):
-            state = self.init_state(batch)
-            self.grad_mod.reset_state(batch.input)
-
-            for step in range(self.n_step):
-                state = self.solver_step(state, batch, step=step)
-                if not self.training:
-                    state = [s.detach().requires_grad_(True) for s in state]
-
-            if not self.training:
-                state = [self.prior_cost.forward_ae(state), state[1]]
-        return state[0]
-
-
-class BinWeightMod(nn.Module):
-    def forward(self, x, n_prior):
-        if n_prior == 0:
-            return torch.ones(x.shape[0], device=x.device)[..., None, None, None]
-
-        else:
-            return torch.ones(x.shape[0], device=x.device)[..., None, None, None]*float('-inf')
+    pass
 
 
 class WeightMod(nn.Module):
