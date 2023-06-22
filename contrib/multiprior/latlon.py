@@ -13,9 +13,12 @@ MultiPriorTrainingItem = collections.namedtuple(
     'MultiPriorTrainingItem', ['input', 'tgt', 'lat', 'lon']
 )
 
-def load_data_with_lat_lon(
+def load_data(
     inp_path, gt_path, obs_var='five_nadirs', train_domain=None,
 ):
+    """
+    Load (lat, lon)-multiprior data.
+    """
     inp = xr.open_dataset(inp_path)[obs_var]
     gt = (
         xr.open_dataset(gt_path)

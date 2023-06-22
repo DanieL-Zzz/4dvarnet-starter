@@ -1,13 +1,27 @@
 # @package _global_
 
-entrypoint: contrib.multiprior.train
-checkpoint: null
-max_epochs: 300
+_entrypoint: contrib.multiprior.train
+_checkpoint: null
+_max_epochs: 3
+_scheme: ${_sch.latlon}  # state-based or (lat, lon)-based multiprior
+_sch:
+  state:  # state-based multiprior
+    source: contrib.multiprior
+    weight:
+      in_channel: ${datamodule.xrds_kw.patch_dims.time}
+      out_channel: 1
+      upsample_mode: bicubic
+  latlon: # (lat, lon)-based multiprior
+    source: contrib.multiprior.latlon
+    weight:
+      in_channel: 2
+      out_channel: 1
+      upsample_mode: bilinear
 
 datamodule:
-  _target_: contrib.multiprior.latlon.MultiPriorDataModule
+  _target_: ${_scheme.source}.MultiPriorDataModule
   input_da:
-    _target_: contrib.multiprior.latlon.load_data_with_lat_lon
+    _target_: ${_scheme.source}.load_data
     inp_path: ${path.input}
     gt_path: ${path.gt}
     train_domain: ${domain.train}
@@ -27,19 +41,19 @@ datamodule:
     aug_factor: 5
 
 model:
-  _target_: contrib.multiprior.latlon.MultiPriorLitModel
+  _target_: ${_scheme.source}.MultiPriorLitModel
   opt_fn:
     _target_: src.utils.cosanneal_lr_adam
     _partial_: true
     lr: 1e-3
-    T_max: ${max_epochs}
+    T_max: ${_max_epochs}
   rec_weight:
       _target_: src.utils.get_triang_time_wei
       patch_dims: ${datamodule.xrds_kw.patch_dims}
       crop: {time: 0, lat: 20, lon: 20}
       offset: 0
   solver:
-    _target_: contrib.multiprior.latlon.MultiPriorGradSolver
+    _target_: ${_scheme.source}.MultiPriorGradSolver
     n_step: 15
     lr_grad: 0.2
     prior_cost:
@@ -56,6 +70,9 @@ model:
       weight_mod_factory:
         _target_: contrib.multiprior.WeightMod
         _partial_: true
+        in_channel: ${_scheme.weight.in_channel}
+        out_channel: ${_scheme.weight.out_channel}
+        upsample_mode: ${_scheme.weight.upsample_mode}
     obs_cost:
       _target_: src.models.BaseObsCost
     grad_mod:
@@ -108,7 +125,7 @@ trainer:
     save_dir: ${hydra:runtime.output_dir}
     name: ''
     version: ''
-  max_epochs: ${max_epochs}
+  max_epochs: ${_max_epochs}
   callbacks:
     - _target_: src.versioning_cb.VersioningCallback
     - _target_: pytorch_lightning.callbacks.LearningRateMonitor
@@ -120,11 +137,11 @@ trainer:
 entrypoints:
   - _target_: pytorch_lightning.seed_everything
     seed: 333
-  - _target_: ${entrypoint}
+  - _target_: ${_entrypoint}
     trainer: ${trainer}
     model: ${model}
     dm: ${datamodule}
-    ckpt: ${checkpoint}
+    ckpt: ${_checkpoint}
 
 defaults:
 - /domain: gf

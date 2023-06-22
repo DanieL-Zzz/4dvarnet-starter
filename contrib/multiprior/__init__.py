@@ -1,10 +1,10 @@
-import collections
 from pathlib import Path
 
 import einops
 import pandas as pd
 import torch
 import torch.nn as nn
+import xarray as xr
 
 import src.data
 import src.models
@@ -25,15 +25,35 @@ def test(trainer, model, dm, ckpt):
 
     trainer.test(model, datamodule=dm, ckpt_path=ckpt)
 
+def load_data(
+    inp_path, gt_path, obs_var='five_nadirs', train_domain=None,
+):
+    """
+    Load state-multiprior data.
+    """
+    inp = xr.open_dataset(inp_path)[obs_var]
+    gt = (
+        xr.open_dataset(gt_path)
+        .ssh.isel(time=slice(0, -1))
+        .interp(lat=inp.lat, lon=inp.lon, method='nearest')
+    )
+
+    ds =  xr.Dataset(dict(input=inp, tgt=(gt.dims, gt.values)), inp.coords)
+
+    if train_domain is not None:
+        ds = ds.sel(train_domain)
+
+    return xr.Dataset(
+        dict(
+            input=ds.input,
+            tgt=src.utils.remove_nan(ds.tgt),
+        ),
+        ds.coords,
+    ).transpose('time', 'lat', 'lon').to_array()
+
 
 class MultiPriorLitModel(src.models.Lit4dVarNet):
     def test_step(self, batch, batch_idx, latlon=None):
-        """
-        If `_input` is specified, add its value as input to MultiPrior
-        along with the output of the solver.
-
-        Used solely for latitude and longitude.
-        """
         if batch_idx == 0:
             self.test_data = []
         out = self(batch=batch)
@@ -107,9 +127,9 @@ class MultiPriorCost(nn.Module):
         )
 
     def forward_ae(self, state):
-        if isinstance(state, collections.abc.Iterable):  # Latitude, longitude
+        if isinstance(state, (list, tuple)):  # Latitude, longitude
             x, coords = state
-        else:
+        else:  # State
             x, coords = state, state
 
         phi_outs = torch.stack([phi.forward_ae(x) for phi in self.prior_costs], dim=0)
@@ -121,9 +141,9 @@ class MultiPriorCost(nn.Module):
 
     @torch.no_grad()
     def detailed_outputs(self, state):
-        if isinstance(state, collections.abc.Iterable):  # Latitude, longitude
+        if isinstance(state, (list, tuple)):  # Latitude, longitude
             x, coords = state
-        else:
+        else:  # State
             x, coords = state, state
 
         phi_outs = [phi.forward_ae(x) for phi in self.prior_costs]
@@ -143,12 +163,12 @@ class MultiPriorGradSolver(src.models.GradSolver):
 
 
 class WeightMod(nn.Module):
-    def __init__(self, resize_factor=5):
+    def __init__(self, in_channel, out_channel, upsample_mode, resize_factor=5):
         super().__init__()
         self.net = nn.Sequential(
             nn.AvgPool2d(resize_factor),
-            nn.Conv2d(2, 1, 7, padding=3),
-            nn.Upsample(scale_factor=resize_factor, mode='bilinear'),
+            nn.Conv2d(in_channel, out_channel, 7, padding=3),
+            nn.Upsample(scale_factor=resize_factor, mode=upsample_mode),
 
             nn.Sigmoid(),
         )
