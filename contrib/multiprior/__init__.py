@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 
 import einops
@@ -15,8 +16,14 @@ def train(trainer, model, dm, ckpt=None):
     print('Train and test', trainer.logger.log_dir)
     print()
 
+    _start = time.time()
+
     trainer.fit(model, dm, ckpt_path=ckpt)
     trainer.test(model, datamodule=dm, ckpt_path='best')
+
+    _duration = time.time() - _start()
+
+    print(f'>>> Duration (train+test): {_duration} s')
 
 def test(trainer, model, dm, ckpt):
     print()
@@ -155,7 +162,11 @@ class MultiPriorCost(nn.Module):
         return phi_outs, phi_weis
 
     def forward(self, state):
-        return nn.functional.mse_loss(state[0], self.forward_ae(state))
+        x = state
+        if isinstance(state, (list, tuple)):  # Latitude, longitude
+            x, _ = state
+
+        return nn.functional.mse_loss(x, self.forward_ae(state))
 
 
 class MultiPriorGradSolver(src.models.GradSolver):

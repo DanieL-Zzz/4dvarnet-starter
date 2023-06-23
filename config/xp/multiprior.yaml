@@ -1,9 +1,9 @@
 # @package _global_
 
-_entrypoint: contrib.multiprior.train
+_entrypoint: train
 _checkpoint: null
-_max_epochs: 3
-_scheme: ${_sch.latlon}  # state-based or (lat, lon)-based multiprior
+_max_epochs: 400
+_scheme: ${_sch.state}  # state-based or (lat, lon)-based multiprior
 _sch:
   state:  # state-based multiprior
     source: contrib.multiprior
@@ -65,8 +65,8 @@ model:
         downsamp: 2
       - _target_: src.models.BilinAEPriorCost
         dim_in: ${datamodule.xrds_kw.patch_dims.time}
-        dim_hidden: 32
-        downsamp: 20
+        dim_hidden: 64
+        downsamp: 2
       weight_mod_factory:
         _target_: contrib.multiprior.WeightMod
         _partial_: true
@@ -137,7 +137,7 @@ trainer:
 entrypoints:
   - _target_: pytorch_lightning.seed_everything
     seed: 333
-  - _target_: ${_entrypoint}
+  - _target_: "contrib.multiprior.${_entrypoint}"
     trainer: ${trainer}
     model: ${model}
     dm: ${datamodule}
