@@ -73,9 +73,11 @@ class MultiPriorLitModel(src.models.Lit4dVarNet):
         _priors, _weights = self.solver.prior_cost.detailed_outputs(_input)
 
         # Make sure priors' outputs and weights have the same channel
-        _repeat = lambda x: einops.repeat(
-            x, 'b c h w -> b (repeat c) h w', repeat=_priors[0].shape[1],
-        )
+        _repeat = lambda x: x
+        if _input.shape[1] != _weights[0].shape[1]:
+            _repeat = lambda x: einops.repeat(
+                x, 'b c h w -> b (repeat c) h w', repeat=_priors[0].shape[1],
+            )
 
         _tensors = []
         _tensors.extend([

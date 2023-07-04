@@ -9,7 +9,7 @@ _sch:
     source: contrib.multiprior
     weight:
       in_channel: ${datamodule.xrds_kw.patch_dims.time}
-      out_channel: 1
+      out_channel: ${datamodule.xrds_kw.patch_dims.time}
       upsample_mode: bicubic
   latlon: # (lat, lon)-based multiprior
     source: contrib.multiprior.latlon
