@@ -1,7 +1,12 @@
+from copy import deepcopy
+import functools as ft
+from itertools import product
 import time
 from pathlib import Path
 
 import einops
+import numpy as np
+from omegaconf import OmegaConf
 import pandas as pd
 import torch
 import torch.nn as nn
@@ -57,6 +62,49 @@ def load_data(
         ),
         ds.coords,
     ).transpose('time', 'lat', 'lon').to_array()
+
+def build_domains(domains, train, val, test):
+    """
+    Add each domain from `domains` to `train`, `val` and `test`. The
+    return is a dict of DictConfig.
+    """
+    result = {
+        'train': [],
+        'val': [],
+        'test': [],
+    }
+    _items = [('train', train), ('val', val), ('test', test)]
+
+    for (key, oparam), value in product(_items, domains.values()):
+        result[key].append(OmegaConf.merge(oparam, value['train']))
+
+    return result
+
+def crop_smallest_containing_domain(subdomains):
+    latitude, longitude = [None, None], [None, None]
+
+    for subdomain in subdomains.values():
+        start_lat = subdomain['train']['lat'].start
+        stop_lat = subdomain['train']['lat'].stop
+        start_lon = subdomain['train']['lon'].start
+        stop_lon = subdomain['train']['lon'].stop
+
+        if latitude[0] is None or latitude[0] > start_lat:
+            latitude[0] = start_lat
+
+        if latitude[1] is None or latitude[1] < stop_lat:
+            latitude[1] = stop_lat
+
+        if longitude[0] is None or longitude[0] > start_lon:
+            longitude[0] = start_lon
+
+        if longitude[1] is None or longitude[1] < stop_lon:
+            longitude[1] = stop_lon
+
+    return {
+        'lat': slice(*latitude),
+        'lon': slice(*longitude),
+    }
 
 
 class MultiPriorLitModel(src.models.Lit4dVarNet):
@@ -125,6 +173,57 @@ class MultiPriorLitModel(src.models.Lit4dVarNet):
 
 class MultiPriorDataModule(src.data.BaseDataModule):
     pass
+
+
+class MultiPriorConcatDataModule(src.data.ConcatDataModule):
+    def train_mean_std(self):
+        sum, count = 0, 0
+        for domain in self.domains['train']:
+            _sum, _count = (
+                self.input_da
+                .sel(domain)
+                .sel(variable='tgt')
+                .pipe(lambda da: (da.sum(), da.pipe(np.isfinite).sum()))
+            )
+            sum += _sum
+            count += _count
+        mean = sum / count
+
+        sum = 0
+        for domain in self.domains['train']:
+            _sum = (
+                self.input_da
+                .sel(domain)
+                .sel(variable='tgt')
+                .pipe(lambda da: da - mean)
+                .pipe(np.square)
+                .sum()
+            )
+            sum += _sum
+        std = (sum / count)**0.5
+        return mean.values.item(), std.values.item()
+
+    def setup(self, stage='test'):
+        post_fn = self.post_fn()
+
+        _train, _val, _test = [], [], []
+        _items = [('train', _train), ('val', _val), ('test', _test)]
+        for key, _list in _items:
+            _list.extend(
+                src.data.XrDataset(
+                    self.input_da.sel(domain),
+                    **self.xrds_kw,
+                    postpro_fn=post_fn,
+                )
+                for domain in self.domains[key]
+            )
+
+        self.train_ds = src.data.XrConcatDataset(_train)
+        if self.aug_kw:
+            self.train_ds = src.data.AugmentedDataset(self.train_ds, **self.aug_kw)
+
+        self.val_ds = src.data.XrConcatDataset(_val)
+        self.test_ds = src.data.XrConcatDataset(_test)
 
 
 class MultiPriorCost(nn.Module):
