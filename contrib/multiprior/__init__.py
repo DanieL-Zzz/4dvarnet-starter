@@ -26,7 +26,7 @@ def train(trainer, model, dm, ckpt=None):
     trainer.fit(model, dm, ckpt_path=ckpt)
     trainer.test(model, datamodule=dm, ckpt_path='best')
 
-    _duration = time.time() - _start()
+    _duration = time.time() - _start
 
     print(f'>>> Duration (train+test): {_duration} s')
 
