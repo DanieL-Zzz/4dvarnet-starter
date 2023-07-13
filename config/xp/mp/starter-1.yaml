@@ -2,7 +2,7 @@
 
 _entrypoint: train
 _checkpoint: null
-_max_epochs: 400
+_max_epochs: 800
 _scheme: ${_sch.state}  # state-based or (lat, lon)-based multiprior
 _sch:
   state:  # state-based multiprior
@@ -88,8 +88,8 @@ model:
     _target_: xarray.Dataset.sel
     _partial_: true
     time: {_target_: builtins.slice, _args_: ['2012-10-22', '2012-12-02']}
-    lat: null #${domain.test.lat}
-    lon: null #${domain.test.lon}
+    lat: ${domains.0.test.lat}
+    lon: ${domains.0.test.lon}
 
 metrics:
   nrmse_scores:
