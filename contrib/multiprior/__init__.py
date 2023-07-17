@@ -133,7 +133,7 @@ class MultiPriorLitModel(src.models.Lit4dVarNet):
             batch.tgt.cpu() * s + m,
             out.squeeze(dim=-1).detach().cpu() * s + m,
         ])
-        _tensors.extend(p.cpu() for p in _priors)
+        _tensors.extend(p.cpu() * s + m for p in _priors)
         _tensors.extend(_repeat(w).cpu() for w in _weights)
 
         self.test_data.append(torch.stack(_tensors, dim=1))
