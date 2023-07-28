@@ -1,10 +1,12 @@
+from collections import namedtuple
 from copy import deepcopy
 import functools as ft
 from itertools import product
-import time
 from pathlib import Path
+import time
 
 import einops
+import kornia.filters as kfilts
 import numpy as np
 from omegaconf import OmegaConf
 import pandas as pd
@@ -15,6 +17,9 @@ import xarray as xr
 import src.data
 import src.models
 import src.utils
+
+TrainingItem = namedtuple('TrainingItem', ['input', 'tgt', 'oi'])
+
 
 def train(trainer, model, dm, ckpt=None):
     print()
@@ -38,29 +43,41 @@ def test(trainer, model, dm, ckpt):
     trainer.test(model, datamodule=dm, ckpt_path=ckpt)
 
 def load_data(
-    inp_path, gt_path, obs_var='five_nadirs', train_domain=None,
+    inp_path, gt_path, oi_path=None, oi_var='ssh_mod', obs_var='five_nadirs',
+    train_domain=None,
 ):
     """
     Load state-multiprior data.
     """
-    inp = xr.open_dataset(inp_path)[obs_var]
+    train_domain = train_domain or {}
+
+    inp = xr.open_dataset(inp_path)[obs_var].sel(train_domain)
+    time_slice = slice(0, -1) if len(inp.time) < 365 else slice(None, None)
     gt = (
         xr.open_dataset(gt_path)
-        .ssh.isel(time=slice(0, -1))
+        .ssh
+        .sel(train_domain)
+        .isel(time=time_slice)
         .interp(lat=inp.lat, lon=inp.lon, method='nearest')
     )
+    variables = dict(input=inp, tgt=(gt.dims, gt.values))
 
-    ds =  xr.Dataset(dict(input=inp, tgt=(gt.dims, gt.values)), inp.coords)
+    if oi_path:
+        oi = (
+            xr.open_dataset(oi_path)[oi_var]
+            .sel(train_domain)
+            .isel(time=time_slice)
+            .interp(lat=inp.lat, lon=inp.lon, method='nearest')
+        )
+        variables['oi'] = (oi.dims, oi.values)
 
-    if train_domain is not None:
-        ds = ds.sel(train_domain)
+    ds =  xr.Dataset(variables, inp.coords).sel(train_domain)
 
+    ds_variables = dict(input=ds.input, tgt=src.utils.remove_nan(ds.tgt))
+    if oi_path:
+        ds_variables['oi'] = ds.oi
     return xr.Dataset(
-        dict(
-            input=ds.input,
-            tgt=src.utils.remove_nan(ds.tgt),
-        ),
-        ds.coords,
+        ds_variables, ds.coords,
     ).transpose('time', 'lat', 'lon').to_array()
 
 def build_domains(domains, train, val, test):
@@ -108,17 +125,32 @@ def crop_smallest_containing_domain(subdomains):
 
 
 class MultiPriorLitModel(src.models.Lit4dVarNet):
+    def step(self, batch, phase=""):
+        if self.training and batch.tgt.isfinite().float().mean() < 0.9:
+            return None, None
+
+        loss, out = self.base_step(batch, phase)
+        grad_loss = self.weighted_mse(
+            kfilts.sobel(out) - kfilts.sobel(batch.tgt), self.rec_weight,
+        )
+        prior_cost = self.solver.prior_cost(self.solver.init_state(batch, out), batch)
+        self.log( f"{phase}_gloss", grad_loss, prog_bar=True, on_step=False, on_epoch=True)
+
+        training_loss = 50 * loss + 1000 * grad_loss + 1.0 * prior_cost
+        return training_loss, out
+
     def test_step(self, batch, batch_idx, latlon=None):
         if batch_idx == 0:
             self.test_data = []
         out = self(batch=batch)
         m, s = self.norm_stats
+        m_oi, s_oi = self.trainer.datamodule.norm_stats(oi_only=True)
 
         _input = out
         if latlon is not None:
             _input = (out, latlon)
 
-        _priors, _weights = self.solver.prior_cost.detailed_outputs(_input)
+        _priors, _weights = self.solver.prior_cost.detailed_outputs(_input, batch)
 
         # Make sure priors' outputs and weights have the same channel
         _repeat = lambda x: x
@@ -131,6 +163,7 @@ class MultiPriorLitModel(src.models.Lit4dVarNet):
         _tensors.extend([
             batch.input.cpu() * s + m,
             batch.tgt.cpu() * s + m,
+            batch.oi.cpu() * s_oi + m_oi,
             out.squeeze(dim=-1).detach().cpu() * s + m,
         ])
         _tensors.extend(p.cpu() * s + m for p in _priors)
@@ -146,7 +179,7 @@ class MultiPriorLitModel(src.models.Lit4dVarNet):
             rec_da = rec_da[0]
 
         n_priors = len(self.solver.prior_cost.prior_costs)
-        legend = ['inp', 'tgt', 'out']  # Somethings is wrong here
+        legend = ['inp', 'tgt', 'oi', 'out']  # Somethings is wrong here
         legend.extend([f'phi{k}_out' for k in range(n_priors)])
         legend.extend([f'phi{k}_weight' for k in range(n_priors)])
 
@@ -154,7 +187,7 @@ class MultiPriorLitModel(src.models.Lit4dVarNet):
             dict(v0=legend)
         ).to_dataset(dim='v0')
 
-        metric_data = self.test_data[legend[:3]].pipe(self.pre_metric_fn)
+        metric_data = self.test_data[legend[:4]].pipe(self.pre_metric_fn)
         metrics = pd.Series({
             metric_n: metric_fn(metric_data)
             for metric_n, metric_fn in self.metrics.items()
@@ -172,7 +205,43 @@ class MultiPriorLitModel(src.models.Lit4dVarNet):
 
 
 class MultiPriorDataModule(src.data.BaseDataModule):
-    pass
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._norm_stats_oi = None
+
+    def train_mean_std(self, oi_only=False):
+        train_data = self.input_da.sel(self.xrds_kw.get('domain_limits', {})).sel(self.domains['train'])
+        mean_std = lambda var: (
+            train_data
+            .sel(variable=var)
+            .pipe(lambda da: (da.mean().values.item(), da.std().values.item()))
+        )
+
+        return mean_std('oi') if oi_only else mean_std('tgt')
+
+    def norm_stats(self, oi_only=False):
+        if oi_only:
+            if self._norm_stats_oi is None:
+                self._norm_stats_oi = self.train_mean_std(oi_only=True)
+            return self._norm_stats_oi
+
+        if self._norm_stats is None:
+            self._norm_stats = self.train_mean_std(oi_only=oi_only)
+        return self._norm_stats
+
+    def post_fn(self):
+        m, s = self.norm_stats()
+        m_oi, s_oi = self.norm_stats(oi_only=True)
+
+        normalize = lambda item: (item - m) / s
+        normalize_oi = lambda item: (item - m_oi) / s_oi
+
+        return ft.partial(ft.reduce,lambda i, f: f(i), [
+            TrainingItem._make,
+            lambda item: item._replace(tgt=normalize(item.tgt)),
+            lambda item: item._replace(input=normalize(item.input)),
+            lambda item: item._replace(oi=normalize_oi(item.oi)),
+        ])
 
 
 class MultiPriorConcatDataModule(src.data.ConcatDataModule):
@@ -234,11 +303,11 @@ class MultiPriorCost(nn.Module):
             [weight_mod_factory() for _ in prior_costs]
         )
 
-    def forward_ae(self, state):
+    def forward_ae(self, state, batch):
         if isinstance(state, (list, tuple)):  # Latitude, longitude
             x, coords = state
         else:  # State
-            x, coords = state, state
+            x, coords = state, batch.oi.nan_to_num()
 
         phi_outs = torch.stack([phi.forward_ae(x) for phi in self.prior_costs], dim=0)
         phi_weis = torch.softmax(
@@ -248,11 +317,11 @@ class MultiPriorCost(nn.Module):
         return phi_out
 
     @torch.no_grad()
-    def detailed_outputs(self, state):
+    def detailed_outputs(self, state, batch):
         if isinstance(state, (list, tuple)):  # Latitude, longitude
             x, coords = state
         else:  # State
-            x, coords = state, state
+            x, coords = state, batch.oi.nan_to_num()
 
         phi_outs = [phi.forward_ae(x) for phi in self.prior_costs]
         _weights = torch.softmax(
@@ -262,16 +331,40 @@ class MultiPriorCost(nn.Module):
 
         return phi_outs, phi_weis
 
-    def forward(self, state):
+    def forward(self, state, batch):
         x = state
         if isinstance(state, (list, tuple)):  # Latitude, longitude
             x, _ = state
 
-        return nn.functional.mse_loss(x, self.forward_ae(state))
+        return nn.functional.mse_loss(x, self.forward_ae(state, batch))
 
 
 class MultiPriorGradSolver(src.models.GradSolver):
-    pass
+    def solver_step(self, state, batch, step):
+        var_cost = self.prior_cost(state, batch) + self.obs_cost(state, batch)
+        grad = torch.autograd.grad(var_cost, state, create_graph=True)[0]
+
+        gmod = self.grad_mod(grad)
+        state_update = (
+            1 / (step + 1) * gmod
+                + self.lr_grad * (step + 1) / self.n_step * grad
+        )
+
+        return state - state_update
+
+    def forward(self, batch):
+        with torch.set_grad_enabled(True):
+            state = self.init_state(batch)
+            self.grad_mod.reset_state(batch.input)
+
+            for step in range(self.n_step):
+                state = self.solver_step(state, batch, step=step)
+                if not self.training:
+                    state = state.detach().requires_grad_(True)
+
+            if not self.training:
+                state = self.prior_cost.forward_ae(state, batch)
+        return state
 
 
 class WeightMod(nn.Module):
