@@ -68,6 +68,8 @@ def load_data(
             .sel(train_domain)
             .isel(time=time_slice)
             .interp(lat=inp.lat, lon=inp.lon, method='nearest')
+            .where(lambda x: -5. < x)  # Remove aberrant values (too
+            .where(lambda x: x < 5.)   # small or too big)
         )
         variables['oi'] = (oi.dims, oi.values)
 
