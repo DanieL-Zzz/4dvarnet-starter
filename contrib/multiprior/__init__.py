@@ -18,7 +18,7 @@ import src.data
 import src.models
 import src.utils
 
-TrainingItem = namedtuple('TrainingItem', ['input', 'tgt', 'oi'])
+TrainingItem = namedtuple('TrainingItem', ['input', 'tgt', 'wei'])
 
 
 def train(trainer, model, dm, ckpt=None):
@@ -43,7 +43,7 @@ def test(trainer, model, dm, ckpt):
     trainer.test(model, datamodule=dm, ckpt_path=ckpt)
 
 def load_data(
-    inp_path, gt_path, oi_path=None, oi_var='ssh_mod', obs_var='five_nadirs',
+    inp_path, gt_path, wei_path=None, wei_var='ssh_mod', obs_var='five_nadirs',
     train_domain=None,
 ):
     """
@@ -62,22 +62,22 @@ def load_data(
     )
     variables = dict(input=inp, tgt=(gt.dims, gt.values))
 
-    if oi_path:
-        oi = (
-            xr.open_dataset(oi_path)[oi_var]
+    if wei_path:
+        wei = (
+            xr.open_dataset(wei_path)[wei_var]
             .sel(train_domain)
             .isel(time=time_slice)
             .interp(lat=inp.lat, lon=inp.lon, method='nearest')
             .where(lambda x: -5. < x)  # Remove aberrant values (too
             .where(lambda x: x < 5.)   # small or too big)
         )
-        variables['oi'] = (oi.dims, oi.values)
+        variables['wei'] = (wei.dims, wei.values)
 
     ds =  xr.Dataset(variables, inp.coords).sel(train_domain)
 
     ds_variables = dict(input=ds.input, tgt=src.utils.remove_nan(ds.tgt))
-    if oi_path:
-        ds_variables['oi'] = ds.oi
+    if wei_path:
+        ds_variables['wei'] = ds.wei
     return xr.Dataset(
         ds_variables, ds.coords,
     ).transpose('time', 'lat', 'lon').to_array()
@@ -146,7 +146,7 @@ class MultiPriorLitModel(src.models.Lit4dVarNet):
             self.test_data = []
         out = self(batch=batch)
         m, s = self.norm_stats
-        m_oi, s_oi = self.trainer.datamodule.norm_stats(oi_only=True)
+        m_wei, s_wei = self.trainer.datamodule.norm_stats(wei_only=True)
 
         _input = out
         if latlon is not None:
@@ -165,7 +165,7 @@ class MultiPriorLitModel(src.models.Lit4dVarNet):
         _tensors.extend([
             batch.input.cpu() * s + m,
             batch.tgt.cpu() * s + m,
-            batch.oi.cpu() * s_oi + m_oi,
+            batch.wei.cpu() * s_wei + m_wei,
             out.squeeze(dim=-1).detach().cpu() * s + m,
         ])
         _tensors.extend(p.cpu() * s + m for p in _priors)
@@ -181,7 +181,7 @@ class MultiPriorLitModel(src.models.Lit4dVarNet):
             rec_da = rec_da[0]
 
         n_priors = len(self.solver.prior_cost.prior_costs)
-        legend = ['inp', 'tgt', 'oi', 'out']  # Somethings is wrong here
+        legend = ['inp', 'tgt', 'wei', 'out']  # Somethings is wrong here
         legend.extend([f'phi{k}_out' for k in range(n_priors)])
         legend.extend([f'phi{k}_weight' for k in range(n_priors)])
 
@@ -209,9 +209,9 @@ class MultiPriorLitModel(src.models.Lit4dVarNet):
 class MultiPriorDataModule(src.data.BaseDataModule):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._norm_stats_oi = None
+        self._norm_stats_wei = None
 
-    def train_mean_std(self, oi_only=False):
+    def train_mean_std(self, wei_only=False):
         train_data = self.input_da.sel(self.xrds_kw.get('domain_limits', {})).sel(self.domains['train'])
         mean_std = lambda var: (
             train_data
@@ -219,30 +219,30 @@ class MultiPriorDataModule(src.data.BaseDataModule):
             .pipe(lambda da: (da.mean().values.item(), da.std().values.item()))
         )
 
-        return mean_std('oi') if oi_only else mean_std('tgt')
+        return mean_std('wei') if wei_only else mean_std('tgt')
 
-    def norm_stats(self, oi_only=False):
-        if oi_only:
-            if self._norm_stats_oi is None:
-                self._norm_stats_oi = self.train_mean_std(oi_only=True)
-            return self._norm_stats_oi
+    def norm_stats(self, wei_only=False):
+        if wei_only:
+            if self._norm_stats_wei is None:
+                self._norm_stats_wei = self.train_mean_std(wei_only=True)
+            return self._norm_stats_wei
 
         if self._norm_stats is None:
-            self._norm_stats = self.train_mean_std(oi_only=oi_only)
+            self._norm_stats = self.train_mean_std(wei_only=wei_only)
         return self._norm_stats
 
     def post_fn(self):
         m, s = self.norm_stats()
-        m_oi, s_oi = self.norm_stats(oi_only=True)
+        m_wei, s_wei = self.norm_stats(wei_only=True)
 
         normalize = lambda item: (item - m) / s
-        normalize_oi = lambda item: (item - m_oi) / s_oi
+        normalize_wei = lambda item: (item - m_wei) / s_wei
 
         return ft.partial(ft.reduce,lambda i, f: f(i), [
             TrainingItem._make,
             lambda item: item._replace(tgt=normalize(item.tgt)),
             lambda item: item._replace(input=normalize(item.input)),
-            lambda item: item._replace(oi=normalize_oi(item.oi)),
+            lambda item: item._replace(wei=normalize_wei(item.wei)),
         ])
 
 
@@ -309,7 +309,7 @@ class MultiPriorCost(nn.Module):
         if isinstance(state, (list, tuple)):  # Latitude, longitude
             x, coords = state
         else:  # State
-            x, coords = state, batch.oi.nan_to_num()
+            x, coords = state, batch.wei.nan_to_num()
 
         phi_outs = torch.stack([phi.forward_ae(x) for phi in self.prior_costs], dim=0)
         phi_weis = torch.softmax(
@@ -323,7 +323,7 @@ class MultiPriorCost(nn.Module):
         if isinstance(state, (list, tuple)):  # Latitude, longitude
             x, coords = state
         else:  # State
-            x, coords = state, batch.oi.nan_to_num()
+            x, coords = state, batch.wei.nan_to_num()
 
         phi_outs = [phi.forward_ae(x) for phi in self.prior_costs]
         _weights = torch.softmax(
