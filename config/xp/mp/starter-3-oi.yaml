@@ -24,8 +24,8 @@ datamodule:
     _target_: ${_scheme.source}.load_data
     inp_path: ${path.input}
     gt_path: ${path.gt}
-    oi_path: ${path.oi}
-    oi_var: ssh_mod
+    wei_path: ${path.oi}
+    wei_var: ssh_mod
     obs_var: ssh_obs
     train_domain: ${domain.train}
   domains:

@@ -24,8 +24,8 @@ datamodule:
     _target_: ${_scheme.source}.load_data
     inp_path: ${path.input}
     gt_path: ${path.gt}
-    oi_path: ${path.sst}
-    oi_var: sst
+    wei_path: ${path.sst}
+    wei_var: sst
     obs_var: five_nadirs
     train_domain: ${domain.train}
   domains:
