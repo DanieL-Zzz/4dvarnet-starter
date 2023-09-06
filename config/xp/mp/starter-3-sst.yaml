@@ -71,18 +71,12 @@ model:
         dim_hidden: 32
         downsamp: 2
       weight_mod_factory:
-        - _target_: contrib.multiprior.WeightMod
-          in_channel: ${_scheme.weight.in_channel}
-          out_channel: ${_scheme.weight.out_channel}
-          upsample_mode: ${_scheme.weight.upsample_mode}
-          resize_factor: 10
-        - _target_: contrib.multiprior.DeeperWeightMod
-          in_channel: ${_scheme.weight.in_channel}
-          mid_channel: 8
-          out_channel: ${_scheme.weight.out_channel}
-          upsample_mode: ${_scheme.weight.upsample_mode}
-          resize_factor: 10
-
+        _target_: contrib.multiprior.WeightMod
+        _partial_: true
+        in_channel: ${_scheme.weight.in_channel}
+        out_channel: ${_scheme.weight.out_channel}
+        upsample_mode: ${_scheme.weight.upsample_mode}
+        resize_factor: 10
     obs_cost:
       _target_: src.models.BaseObsCost
     grad_mod:
