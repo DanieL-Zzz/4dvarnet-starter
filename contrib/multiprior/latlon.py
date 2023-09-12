@@ -41,6 +41,28 @@ def load_data(
         ds.coords,
     ).transpose('time', 'lat', 'lon').to_array()
 
+def _get_train_range(obj, v):
+    train_data = obj.input_da.sel(obj.xrds_kw.get('domain_limits', {}))
+
+    return train_data[v].min().values.item(), train_data[v].max().values.item()
+
+def _post_fn(obj):
+    normalize = lambda item: (item - obj.norm_stats()[0]) / obj.norm_stats()[1]
+    lat_r = obj.get_train_range('lat')
+    lon_r = obj.get_train_range('lon')
+    minmax_scale = lambda l, r: 2 * (l - r[0]) / (r[1] - r[0]) - 1.
+    return ft.partial(
+        ft.reduce,
+        lambda i, f: f(i),
+        [
+            MultiPriorTrainingItem._make,
+            lambda item: item._replace(tgt=normalize(item.tgt)),
+            lambda item: item._replace(input=normalize(item.input)),
+            lambda item: item._replace(lat=minmax_scale(item.lat, lat_r)),
+            lambda item: item._replace(lon=minmax_scale(item.lon, lon_r)),
+        ],
+    )
+
 
 class MultiPriorLitModel(contrib.multiprior.MultiPriorLitModel):
     def test_step(self, batch, batch_idx):
@@ -53,27 +75,18 @@ class MultiPriorLitModel(contrib.multiprior.MultiPriorLitModel):
 
 class MultiPriorDataModule(contrib.multiprior.MultiPriorDataModule):
     def get_train_range(self, v):
-        train_data = self.input_da.sel(self.xrds_kw.get('domain_limits', {})).sel(
-            self.domains['train']
-        )
-        return train_data[v].min().values.item(), train_data[v].max().values.item()
+        return _get_train_range(self, v)
 
     def post_fn(self):
-        normalize = lambda item: (item - self.norm_stats()[0]) / self.norm_stats()[1]
-        lat_r = self.get_train_range('lat')
-        lon_r = self.get_train_range('lon')
-        minmax_scale = lambda l, r: 2 * (l - r[0]) / (r[1] - r[0]) - 1.
-        return ft.partial(
-            ft.reduce,
-            lambda i, f: f(i),
-            [
-                MultiPriorTrainingItem._make,
-                lambda item: item._replace(tgt=normalize(item.tgt)),
-                lambda item: item._replace(input=normalize(item.input)),
-                lambda item: item._replace(lat=minmax_scale(item.lat, lat_r)),
-                lambda item: item._replace(lon=minmax_scale(item.lon, lon_r)),
-            ],
-        )
+        return _post_fn(self)
+
+
+class MultiPriorConcatDataModule(contrib.multiprior.MultiPriorConcatDataModule):
+    def get_train_range(self, v):
+        return _get_train_range(self, v)
+
+    def post_fn(self):
+        return _post_fn(self)
 
 
 class MultiPriorGradSolver(contrib.multiprior.MultiPriorGradSolver):
