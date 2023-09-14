@@ -45,7 +45,7 @@ model:
   opt_fn:
     _target_: src.utils.cosanneal_lr_adam
     _partial_: true
-    lr: 1e-4
+    lr: 1e-3
     T_max: ${_max_epochs}
   rec_weight:
       _target_: src.utils.get_triang_time_wei
@@ -73,7 +73,7 @@ model:
         in_channel: ${_scheme.weight.in_channel}
         out_channel: ${_scheme.weight.out_channel}
         upsample_mode: ${_scheme.weight.upsample_mode}
-        reduce_factor: 1
+        reduce_factor: 2
         resize_factor: 10
     obs_cost:
       _target_: src.models.BaseObsCost
