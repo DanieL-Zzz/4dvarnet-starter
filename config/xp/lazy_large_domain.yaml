@@ -1,0 +1,14 @@
+# @package _global_
+
+datamodule:
+  _target_: contrib.lazyloading.LazyDataModule
+  input_da: null
+  loader:
+    _partial_: true
+    _target_: contrib.lazyloading.lazily_load_full_natl
+    inp_path: ${paths.obs}
+    tgt_path: ${paths.gt}
+
+defaults:
+  - large_domain
+  - _self_
