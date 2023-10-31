@@ -150,12 +150,12 @@ def load_altimetry_data(path, obs_from_tgt=False):
         .assign(
             input=lambda ds: ds.nadir_obs,
             tgt=lambda ds: remove_nan(ds.ssh),
-        )    
+        )
     )
 
     if obs_from_tgt:
         ds = ds.assign(input=ds.tgt.where(np.isfinite(ds.input), np.nan))
-    
+
     return (
         ds[[*src.data.TrainingItem._fields]]
         .transpose("time", "lat", "lon")
@@ -182,6 +182,27 @@ def load_full_natl_data(
     )
 
     return xr.Dataset(dict(input=inp, tgt=(gt.dims, gt.values)), inp.coords).to_array().sortby('variable')
+
+
+def load_natl_data(tgt_path, tgt_var, inp_path, inp_var, **kwargs):
+    tgt = (
+        xr.open_dataset(tgt_path)[tgt_var]
+        .sel(kwargs.get('domain', None))
+        .sel(kwargs.get('period', None))
+        .isel(time=slice(0, -1))  # inp is likely to have only 364 days
+    )
+
+    inp = (
+        xr.open_dataset(inp_path)[inp_var]
+        .sel(kwargs.get('domain', None))
+        .sel(kwargs.get('period', None))
+    )
+
+    return (
+        xr.Dataset(dict(input=inp, tgt=(tgt.dims, tgt.values)), inp.coords)
+        .transpose('time', 'lat', 'lon')
+        .to_array()
+    )
 
 
 def rmse_based_scores_from_ds(ds, ref_variable='tgt', study_variable='out'):
