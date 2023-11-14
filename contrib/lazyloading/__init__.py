@@ -18,35 +18,10 @@ class LazyDataModule(src.data.BaseDataModule):
         # It is normally done when the `self.post_fn` is called but it
         # also requires the `self.input_da` to be stored throughout
         # the whole process, which is not in the current situation
-        self.input_da = self.loader(
-            domain=self.domains['train'], to_array=False,
-        )
+        self.input_da = self.loader(domain=self.domains['train'])
         self.norm_stats()
         del self.input_da
         gc.collect()
-
-    def norm_stats(self):
-        if self._norm_stats is None:
-            self._norm_stats = self.train_mean_std()
-        return self._norm_stats
-
-    def post_fn(self):
-        m, s = self.norm_stats()
-
-        def func(item, sl=None, mean=m, std=s):
-            sl.pop('time', None)
-
-            if not (isinstance(mean, float) or isinstance(std, float)):
-                mean = mean.isel(sl or {}).values
-                std = std.isel(sl or {}).values
-
-            trainit = src.data.TrainingItem._make(item)
-            trainit._replace(input=(trainit.input - mean) / std)
-            trainit._replace(tgt=(trainit.tgt - mean) / std)
-
-            return trainit
-
-        return func
 
     def setup(self, stage=None):
         self.train_ds = LazyXrDataset(
@@ -73,14 +48,10 @@ class LazyDataModule(src.data.BaseDataModule):
             .sel(self.xrds_kw.get('domain_limits', {}))
             .sel(self.domains['train'])
         )
-
         return (
             train_data[variable]
             .pipe(
-                lambda da: (
-                    da.mean(dim='time'),
-                    da.std(dim='time')
-                )
+                lambda da: (da.mean().item(), da.std().item())
             )
         )
 
@@ -92,7 +63,7 @@ class LazyXrDataset(src.data.XrDataset):
         xr.DataArray once called.
         """
         self.loader = loader
-        super().__init__(self.loader(to_array=False).tgt, **kwargs)
+        super().__init__(self.loader().tgt, **kwargs)
 
         # Do not store the data during the whole simulation in order to
         # spare memory (it is the point of this whole module).
@@ -113,7 +84,7 @@ class LazyXrDataset(src.data.XrDataset):
             )
 
         item = (
-            self.loader(sl=sl, to_array=False)
+            self.loader(sl=sl)
             .sel(self.domain_limits or {})
 
             .to_array()
@@ -128,13 +99,13 @@ class LazyXrDataset(src.data.XrDataset):
         gc.collect()
 
         if self.postpro_fn is not None:
-            return self.postpro_fn(item, sl)
+            return self.postpro_fn(item)
         return item
 
 
 def lazily_load_full_natl(
     inp_path, tgt_path, inp_var='five_nadirs', tgt_var='ssh',
-    domain=None, sl=None, to_array=True, engine='netcdf4',
+    domain=None, sl=None, to_array=False, engine='netcdf4',
 ):
     """
     Return a xr.Dataset (xr.DataArray if `to_array` is True) instance.
