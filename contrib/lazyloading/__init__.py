@@ -125,6 +125,7 @@ def lazily_load_full_natl(
 
     to_array: bool
         If True, convert the resulting xr.Dataset into xr.DataArray
+        By doing so, this function is no more considered as lazy!
     """
     with (
         xr.open_dataset(inp_path, engine=engine) as inp,
