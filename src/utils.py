@@ -150,12 +150,12 @@ def load_altimetry_data(path, obs_from_tgt=False):
         .assign(
             input=lambda ds: ds.nadir_obs,
             tgt=lambda ds: remove_nan(ds.ssh),
-        )    
+        )
     )
 
     if obs_from_tgt:
         ds = ds.assign(input=ds.tgt.where(np.isfinite(ds.input), np.nan))
-    
+
     return (
         ds[[*src.data.TrainingItem._fields]]
         .transpose("time", "lat", "lon")
@@ -177,7 +177,7 @@ def load_full_natl_data(
     inp = xr.open_dataset(path_obs)[obs_var]
     gt = (
         xr.open_dataset(path_gt)[gt_var]
-        # .isel(time=slice(0, -1))
+        .isel(time=slice(0, -1))
         .sel(lat=inp.lat, lon=inp.lon, method="nearest")
     )
 
