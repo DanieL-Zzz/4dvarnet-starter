@@ -189,7 +189,7 @@ def load_natl_data(tgt_path, tgt_var, inp_path, inp_var, **kwargs):
         xr.open_dataset(tgt_path)[tgt_var]
         .sel(kwargs.get('domain', None))
         .sel(kwargs.get('period', None))
-        .isel(time=slice(0, -1))  # inp is likely to have only 364 days
+        # .isel(time=slice(0, -1))
     )
 
     inp = (
@@ -199,7 +199,10 @@ def load_natl_data(tgt_path, tgt_var, inp_path, inp_var, **kwargs):
     )
 
     return (
-        xr.Dataset(dict(input=inp, tgt=(tgt.dims, tgt.values)), inp.coords)
+        xr.Dataset(
+            dict(input=inp*tgt, tgt=(tgt.dims, tgt.values)),
+            inp.coords,
+        )
         .transpose('time', 'lat', 'lon')
         .to_array()
     )
