@@ -189,7 +189,6 @@ def load_natl_data(tgt_path, tgt_var, inp_path, inp_var, **kwargs):
         xr.open_dataset(tgt_path)[tgt_var]
         .sel(kwargs.get('domain', None))
         .sel(kwargs.get('period', None))
-        # .isel(time=slice(0, -1))
     )
 
     inp = (
