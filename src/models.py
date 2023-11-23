@@ -44,7 +44,7 @@ class Lit4dVarNet(pl.LightningModule):
 
     def forward(self, batch):
         return self.solver(batch)
-    
+
     def step(self, batch, phase=""):
         if self.training and batch.tgt.isfinite().float().mean() < 0.9:
             return None, None
@@ -103,13 +103,14 @@ class Lit4dVarNet(pl.LightningModule):
 
         metric_data = self.test_data.pipe(self.pre_metric_fn)
         metrics = pd.Series({
-            metric_n: metric_fn(metric_data) 
+            metric_n: metric_fn(metric_data)
             for metric_n, metric_fn in self.metrics.items()
         })
 
         print(metrics.to_frame(name="Metrics").to_markdown())
         if self.logger:
-            self.test_data.to_netcdf(Path(self.logger.log_dir) / 'test_data.nc')
+            # self.test_data.to_netcdf(Path(self.logger.log_dir) / 'test_data.nc')
+            metric_data.to_netcdf(Path(self.logger.log_dir) / 'metric_data.nc')
             print(Path(self.trainer.log_dir) / 'test_data.nc')
             self.logger.log_metrics(metrics.to_dict())
 
@@ -141,7 +142,7 @@ class GradSolver(nn.Module):
             1 / (step + 1) * gmod
                 + self.lr_grad * (step + 1) / self.n_step * grad
         )
-        
+
 
         return state - state_update
 
