@@ -1,7 +1,9 @@
 # @package _global_
 
-domain: ???
-period: ???
+resolution: '1_20'
+entrypoint: train  # 'train' or 'test'
+checkpoint: null
+
 val_period:
   time:
     _target_: builtins.slice
@@ -10,10 +12,12 @@ val_period:
       - 2009-08-11
 
 paths:
-  inp: /DATASET/eNATL/eNATL60_BLB002_SSH_nadirs/eNATL60-BLB002-7nadirs-2009-2010-1_20.nc
+  inp:
+    train: /DATASET/eNATL/eNATL60_BLB002_SSH_nadirs/eNATL60-BLB002-7nadirs-2009-2010-${resolution}.nc
+    test: /DATASET/NATL/NATL60-CJM165-7nadirs-2012-2013-${resolution}.nc
   tgt:
-    train: /DATASET/eNATL/eNATL60_BLB002_SSH_nadirs/eNATL60-BLB002-ssh-2009-2010-1_20.nc
-    test: /DATASET/NATL/NATL60-CJM165_NATL_ssh_y2013.1y.nc
+    train: /DATASET/eNATL/eNATL60_BLB002_SSH_nadirs/eNATL60-BLB002-ssh-2009-2010-${resolution}.nc
+    test: /DATASET/NATL/NATL60-CJM165-ssh-2012-2013-${resolution}.nc
 
 trainer:
   _target_: pytorch_lightning.Trainer
@@ -26,7 +30,7 @@ trainer:
     save_dir: ${hydra:runtime.output_dir}
     name: ${hydra:runtime.choices.xp}
     version: ''
-  max_epochs: 150
+  max_epochs: 500
   callbacks:
     - _target_: pytorch_lightning.callbacks.LearningRateMonitor
     - _target_: pytorch_lightning.callbacks.ModelCheckpoint
@@ -38,12 +42,12 @@ datamodule:
   _target_: src.data.BaseDataModule
   input_da:
     _target_: src.utils.load_natl_data
-    tgt_path: ${paths.tgt.train}
+    tgt_path: ${paths.tgt[${entrypoint}]}  # .train or .test
+    inp_path: ${paths.inp[${entrypoint}]}  # .train or .test
     tgt_var: ssh
-    inp_path: ${paths.inp}
     inp_var: input
     domain: ${domain.train}
-    period: ${period.train}
+    period: ${period[${entrypoint}]}  # .train or .test
   domains:
     train: ${period.train}
     val: ${val_period}
@@ -90,7 +94,7 @@ model:
   pre_metric_fn:
     _target_: xarray.Dataset.sel
     _partial_: true
-    time: {_target_: builtins.slice, _args_: ["2012-10-22", "2012-12-02"]}
+    time: ${period.test.time}
     lat: ${domain.test.lat}
     lon: ${domain.test.lon}
 
@@ -100,10 +104,10 @@ metrics:
   get0: {_target_: operator.itemgetter, _args_: [0]}
   get1: {_target_: operator.itemgetter, _args_: [1]}
   test_metrics:
-    'mu': {_target_: src.utils.pipe, _partial_: true, fns: ['${metrics.nrmse_scores}', '${metrics.get0}']}
-    'sig': {_target_: src.utils.pipe, _partial_: true, fns: ['${metrics.nrmse_scores}', '${metrics.get1}']}
-    'lx': {_target_: src.utils.pipe, _partial_: true, fns: ['${metrics.psd_scores}', '${metrics.get0}']}
-    'lt': {_target_: src.utils.pipe, _partial_: true, fns: ['${metrics.psd_scores}', '${metrics.get1}']}
+    'μ': {_target_: src.utils.pipe, _partial_: true, fns: ['${metrics.nrmse_scores}', '${metrics.get0}']}
+    'σ': {_target_: src.utils.pipe, _partial_: true, fns: ['${metrics.nrmse_scores}', '${metrics.get1}']}
+    'λx': {_target_: src.utils.pipe, _partial_: true, fns: ['${metrics.psd_scores}', '${metrics.get0}']}
+    'λt': {_target_: src.utils.pipe, _partial_: true, fns: ['${metrics.psd_scores}', '${metrics.get1}']}
 
 entrypoints:
   - _target_: pytorch_lightning.seed_everything
@@ -112,6 +116,7 @@ entrypoints:
     trainer: ${trainer}
     lit_mod: ${model}
     dm: ${datamodule}
+    ckpt: ${checkpoint}
 
 defaults:
   - /domain: gf
