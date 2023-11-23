@@ -242,32 +242,37 @@ class BaseDataModule(pl.LightningDataModule):
 
 
     def setup(self, stage='test'):
-        train_data = self.input_da.sel(self.domains['train'])
-
-        # Drop the validation period from the training period
-        try:
-            train_data = train_data.drop_sel(time=xr.date_range(
-                self.domains['val']['time'].start,
-                self.domains['val']['time'].stop,
-            ))
-        except KeyError:
-            raise KeyError(
-                'Validation period cannot be extracted from given training period!'
-            )
-
         post_fn = self.post_fn()
-        self.train_ds = XrDataset(
-            train_data, **self.xrds_kw, postpro_fn=post_fn,
-        )
-        if self.aug_kw:
-            self.train_ds = AugmentedDataset(self.train_ds, **self.aug_kw)
 
-        self.val_ds = XrDataset(
-            self.input_da.sel(self.domains['val']), **self.xrds_kw, postpro_fn=post_fn,
-        )
-        self.test_ds = XrDataset(
-            self.input_da.sel(self.domains['test']), **self.xrds_kw, postpro_fn=post_fn,
-        )
+        if stage == 'fit':
+            train_data = self.input_da.sel(self.domains['train'])
+
+            # Drop the validation period from the training period
+            try:
+                train_data = train_data.drop_sel(time=xr.date_range(
+                    self.domains['val']['time'].start,
+                    self.domains['val']['time'].stop,
+                ))
+            except KeyError:
+                raise KeyError(
+                    'Validation period cannot be extracted from given training period!'
+                )
+
+            self.train_ds = XrDataset(
+                train_data, **self.xrds_kw, postpro_fn=post_fn,
+            )
+            if self.aug_kw:
+                self.train_ds = AugmentedDataset(self.train_ds, **self.aug_kw)
+
+            self.val_ds = XrDataset(
+                self.input_da.sel(self.domains['val']), **self.xrds_kw, postpro_fn=post_fn,
+            )
+        elif stage == 'test':
+            self.test_ds = XrDataset(
+                self.input_da.sel(self.domains['test']), **self.xrds_kw, postpro_fn=post_fn,
+            )
+        else:
+            raise Exception(f'Unhandled stage {stage} in BaseDataModule.setup')
 
 
     def train_dataloader(self):
