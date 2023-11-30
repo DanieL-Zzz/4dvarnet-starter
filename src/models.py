@@ -101,7 +101,12 @@ class Lit4dVarNet(pl.LightningModule):
             dict(v0=self.test_quantities)
         ).to_dataset(dim='v0')
 
-        metric_data = self.test_data.pipe(self.pre_metric_fn)
+        metric_data = (
+            self.test_data
+            .pipe(self.pre_metric_fn)
+            # .isel(time=slice(20, -20))
+        )
+
         metrics = pd.Series({
             metric_n: metric_fn(metric_data)
             for metric_n, metric_fn in self.metrics.items()
