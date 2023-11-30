@@ -1,0 +1,22 @@
+# @package _global_
+
+resolution: '1_8'
+entrypoint: test  # 'train' or 'test'
+checkpoint: outputs/2023-11-28/14-20-45/comfra_1_8/checkpoints/val_mse=6.30775-epoch=948.ckpt
+
+datamodule:
+  xrds_kw:
+    patch_dims: { time: 15, lat: 96, lon: 96}
+    strides: { time: 1, lat: 80, lon: 80}
+    domain_limits: ${domain.train}
+
+model:
+  rec_weight:
+    _target_: src.utils.get_triang_time_wei
+    patch_dims: ${datamodule.xrds_kw.patch_dims}
+    crop: {time: 0, lat: 7, lon: 7}
+    offset: 1
+
+defaults:
+  - comfra
+  - _self_

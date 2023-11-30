@@ -1,8 +1,9 @@
 # @package _global_
 
 resolution: '1_20'
-entrypoint: train  # 'train' or 'test'
-checkpoint: null
+entrypoint: test  # 'train' or 'test'
+# checkpoint: outputs/2023-11-28/11-46-24/comfra/checkpoints/val_mse=7.97592-epoch=434.ckpt
+checkpoint: outputs/val_rmse_0.0135_epoch_299.ckpt
 
 val_period:
   time:
@@ -30,7 +31,7 @@ trainer:
     save_dir: ${hydra:runtime.output_dir}
     name: ${hydra:runtime.choices.xp}
     version: ''
-  max_epochs: 500
+  max_epochs: 1000
   callbacks:
     - _target_: pytorch_lightning.callbacks.LearningRateMonitor
     - _target_: pytorch_lightning.callbacks.ModelCheckpoint
@@ -51,7 +52,8 @@ datamodule:
   domains:
     train: ${period.train}
     val: ${val_period}
-    test: ${period.test}
+    test:
+      time: {_target_: builtins.slice,  _args_: ['2012-10-01', '2012-12-20']}  # ${period.test}
   xrds_kw:
     patch_dims: { time: 15, lat: 240, lon: 240}
     strides: { time: 1, lat: 200, lon: 200}
@@ -94,7 +96,7 @@ model:
   pre_metric_fn:
     _target_: xarray.Dataset.sel
     _partial_: true
-    time: ${period.test.time}
+    time: {_target_: builtins.slice, _args_: ["2012-10-22", "2012-12-02"]}
     lat: ${domain.test.lat}
     lon: ${domain.test.lon}
 
