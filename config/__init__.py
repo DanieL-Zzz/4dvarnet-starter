@@ -1,3 +1,5 @@
+import datetime
+
 from hydra.core.config_store import ConfigStore
 from omegaconf import OmegaConf
 
@@ -28,6 +30,25 @@ class SingletonStore:
         cls.STORE = {}
 
 
+def grow_dates_by_n_days(dates, n_days=20):
+    """
+    Example:
+
+    ```python
+    >>> dates = ('2009-10-21', '2009-11-30')
+    >>> n_days = 10
+    >>> grow_dates_by_n_days(dates, n_days)
+    ('2009-10-11', '2009-12-10')
+    ```
+    """
+    _format = r'%Y-%m-%d'
+    twenty_days = datetime.timedelta(days=n_days)
+    date_start = datetime.datetime.strptime(dates[0], _format) - twenty_days
+    date_end = datetime.datetime.strptime(dates[1], _format) + twenty_days
+
+    return date_start.strftime(_format), date_end.strftime(_format)
+
+
 cs = ConfigStore.instance()
 
 domains = {
@@ -37,7 +58,7 @@ domains = {
     "cNATL": dict(lon=[-51, -9], lat=[32, 54]),
     "osmosis": dict(lon=[-22.5, -10.5], lat=[44, 56]),
     "gf": dict(lon=[-66, -54], lat=[32, 44]),
-    "gf_15_15": dict(lon=[-64, -49], lat=[29, 44]),
+    "gf_15_15": dict(lon=[-65, -48], lat=[28, 45]),
     "fgf": dict(lon=[-66, -54], lat=[33, 45]),
     "2gf": dict(lon=[-71., -49.], lat=[32, 44]),
     "4gf": dict(lon=[-71., -29.], lat=[32, 44]),
@@ -85,6 +106,9 @@ periods = {
 }
 
 for period_name, dates in periods.items():
+    if period_name != 'allyear':
+        dates[1] = grow_dates_by_n_days(dates[1], n_days=20)
+
     cs.store(
         name=period_name,
         node={

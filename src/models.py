@@ -104,7 +104,7 @@ class Lit4dVarNet(pl.LightningModule):
         metric_data = (
             self.test_data
             .pipe(self.pre_metric_fn)
-            # .isel(time=slice(20, -20))
+            .isel(time=slice(20, -20))
         )
 
         metrics = pd.Series({
