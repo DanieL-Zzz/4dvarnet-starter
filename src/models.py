@@ -265,6 +265,8 @@ class BilinAEPriorCost(nn.Module):
             else nn.Identity()
         )
 
+        torch.nn.init.kaiming_uniform_(self.conv_in.weight)
+
     def forward_ae(self, x):
         x = self.down(x)
         x = self.conv_in(x)
