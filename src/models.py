@@ -132,6 +132,18 @@ class GradSolver(nn.Module):
 
         self._grad_norm = None
 
+        def _apply_kaiming(module):
+            if isinstance(module, torch.nn.Conv2d):
+                torch.nn.init.kaiming_uniform_(module.weight)
+
+        def _apply_xavier(module):
+            if isinstance(module, torch.nn.Conv2d):
+                torch.nn.init.xavier_uniform_(module.weight)
+
+        self.prior_cost.apply(_apply_kaiming)
+        self.grad_mod.apply(_apply_xavier)
+
+
     def init_state(self, batch, x_init=None):
         if x_init is not None:
             return x_init
@@ -264,8 +276,6 @@ class BilinAEPriorCost(nn.Module):
             if downsamp is not None
             else nn.Identity()
         )
-
-        torch.nn.init.kaiming_uniform_(self.conv_in.weight)
 
     def forward_ae(self, x):
         x = self.down(x)
