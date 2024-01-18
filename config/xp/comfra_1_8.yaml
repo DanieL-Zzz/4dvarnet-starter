@@ -1,13 +1,13 @@
 # @package _global_
 
 resolution: '1_8'
-entrypoint: test  # 'train' or 'test'
-checkpoint: outputs/2023-11-28/14-20-45/comfra_1_8/checkpoints/val_mse=6.30775-epoch=948.ckpt
+entrypoint: train  # 'train' or 'test'
+checkpoint: null  # outputs/2023-12-07/17-58-46/comfra_1_8/checkpoints/val_mse=2.41062-epoch=145.ckpt
 
 datamodule:
   xrds_kw:
-    patch_dims: { time: 15, lat: 96, lon: 96}
-    strides: { time: 1, lat: 80, lon: 80}
+    patch_dims: { time: 15, lat: 136, lon: 136}
+    strides: { time: 1, lat: 120, lon: 120}
     domain_limits: ${domain.train}
 
 model:
