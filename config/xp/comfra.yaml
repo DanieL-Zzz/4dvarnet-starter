@@ -122,7 +122,7 @@ entrypoints:
     ckpt: ${checkpoint}
 
 defaults:
-  - /domain: gf
+  - /domain: gf_15_15
   - /period: allyear
   # - /period@val_period: midsummer
   - _self_
