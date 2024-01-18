@@ -1,9 +1,8 @@
 # @package _global_
 
 resolution: '1_20'
-entrypoint: test  # 'train' or 'test'
-# checkpoint: outputs/2023-11-28/11-46-24/comfra/checkpoints/val_mse=7.97592-epoch=434.ckpt
-checkpoint: outputs/val_rmse_0.0135_epoch_299.ckpt
+entrypoint: train  # 'train' or 'test'
+checkpoint: null  # outputs/1_20_GF_15x15/train_epo_112/comfra/checkpoints/val_mse=4.21615-epoch=099.ckpt
 
 val_period:
   time:
@@ -52,11 +51,12 @@ datamodule:
   domains:
     train: ${period.train}
     val: ${val_period}
-    test:
-      time: {_target_: builtins.slice,  _args_: ['2012-10-01', '2012-12-20']}  # ${period.test}
+    test: ${period.test}
+    # test:
+    #   time: {_target_: builtins.slice,  _args_: ['2012-10-01', '2012-12-20']}
   xrds_kw:
-    patch_dims: { time: 15, lat: 240, lon: 240}
-    strides: { time: 1, lat: 200, lon: 200}
+    patch_dims: { time: 15, lat: 340, lon: 340}
+    strides: { time: 1, lat: 300, lon: 300}
     domain_limits: ${domain.train}
   dl_kw: {batch_size: 4, num_workers: 1}
   aug_kw:
@@ -96,7 +96,8 @@ model:
   pre_metric_fn:
     _target_: xarray.Dataset.sel
     _partial_: true
-    time: {_target_: builtins.slice, _args_: ["2012-10-22", "2012-12-02"]}
+    time: ${period.test.time}
+    # time: {_target_: builtins.slice, _args_: ["2012-10-22", "2012-12-02"]}
     lat: ${domain.test.lat}
     lon: ${domain.test.lon}
 
