@@ -2,7 +2,7 @@
 
 resolution: '1_20'
 entrypoint: train  # 'train' or 'test'
-checkpoint: null  # outputs/1_20_GF_15x15/train_epo_112/comfra/checkpoints/val_mse=4.21615-epoch=099.ckpt
+checkpoint: null
 
 val_period:
   time:
@@ -44,7 +44,7 @@ datamodule:
     _target_: src.utils.load_natl_data
     tgt_path: ${paths.tgt[${entrypoint}]}  # .train or .test
     inp_path: ${paths.inp[${entrypoint}]}  # .train or .test
-    tgt_var: ssh
+    tgt_var: ssh_norm
     inp_var: input
     domain: ${domain.train}
     period: ${period[${entrypoint}]}  # .train or .test

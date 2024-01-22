@@ -2,7 +2,7 @@
 
 resolution: '1_8'
 entrypoint: train  # 'train' or 'test'
-checkpoint: null  # outputs/2023-12-07/17-58-46/comfra_1_8/checkpoints/val_mse=2.41062-epoch=145.ckpt
+checkpoint: null
 
 datamodule:
   xrds_kw:
