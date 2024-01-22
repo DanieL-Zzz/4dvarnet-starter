@@ -222,10 +222,7 @@ class BaseDataModule(pl.LightningDataModule):
         self._post_fn = None
 
     def norm_stats(self):
-        if self._norm_stats is None:
-            self._norm_stats = self.train_mean_std()
-            print("Norm stats", self._norm_stats)
-        return self._norm_stats
+        return (0, 1)
 
     def train_mean_std(self, variable='tgt'):
         train_data = self.input_da.sel(self.xrds_kw.get('domain_limits', {})).sel(self.domains['train'])

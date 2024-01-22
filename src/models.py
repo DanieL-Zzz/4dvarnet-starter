@@ -20,10 +20,6 @@ class Lit4dVarNet(pl.LightningModule):
 
     @property
     def norm_stats(self):
-        if self._norm_stats is not None:
-            return self._norm_stats
-        elif self.trainer.datamodule is not None:
-            return self.trainer.datamodule.norm_stats()
         return (0., 1.)
 
     @staticmethod
