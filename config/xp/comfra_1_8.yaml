@@ -1,8 +1,8 @@
 # @package _global_
 
 resolution: '1_8'
-entrypoint: train  # 'train' or 'test'
-checkpoint: null  # outputs/2023-12-07/17-58-46/comfra_1_8/checkpoints/val_mse=2.41062-epoch=145.ckpt
+entrypoint: test  # 'train' or 'test'
+checkpoint: outputs/2024-02-12/22-57-59/comfra_1_8/checkpoints/val_mse=2.21647-epoch=861.ckpt
 
 datamodule:
   xrds_kw:
