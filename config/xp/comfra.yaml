@@ -1,8 +1,8 @@
 # @package _global_
 
 resolution: '1_20'
-entrypoint: train  # 'train' or 'test'
-checkpoint: null  # outputs/1_20_GF_15x15/train_epo_112/comfra/checkpoints/val_mse=4.21615-epoch=099.ckpt
+entrypoint: test  # 'train' or 'test'
+checkpoint: outputs/2024-02-12/22-57-28/comfra/checkpoints/val_mse=1.91041-epoch=978.ckpt
 
 val_period:
   time:
