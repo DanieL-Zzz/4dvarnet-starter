@@ -7,8 +7,8 @@ def base_training(trainer, dm, lit_mod, ckpt=None):
         print("Logdir:", trainer.logger.log_dir)
         print()
 
-    # trainer.fit(lit_mod, datamodule=dm, ckpt_path=ckpt)
-    trainer.test(lit_mod, datamodule=dm, ckpt_path=ckpt)
+    trainer.fit(lit_mod, datamodule=dm, ckpt_path=ckpt)
+    trainer.test(lit_mod, datamodule=dm, ckpt_path='best')
 
 def multi_dm_training(trainer, dm, lit_mod, test_dm=None, test_fn=None, ckpt=None):
     if trainer.logger is not None:

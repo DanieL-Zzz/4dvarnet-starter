@@ -1,0 +1,27 @@
+# @package _global_
+
+paths:
+  inp: /DATASET/NATL/NATL60-CJM165-7nadirs-2012-2013-1_20.nc
+  tgt: /DATASET/NATL/NATL60-CJM165-ssh-2012-2013-1_20.nc
+
+trainer:
+  logger:
+    _target_: pytorch_lightning.loggers.tensorboard.TensorBoardLogger
+
+datamodule:
+  input_da:
+    _target_: src.utils.load_natl_data
+    tgt_path: ${paths.tgt}
+    inp_path: ${paths.inp}
+    tgt_var: ssh
+    inp_var: input
+    domain: ${domain.train}
+  xrds_kw:
+    patch_dims: { time: 15, lat: 340, lon: 340}
+    strides: { time: 1, lat: 300, lon: 300}
+    domain_limits: ${domain.train}
+
+defaults:
+  - base
+  - override /domain: gf_15_15
+  - _self_

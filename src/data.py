@@ -248,15 +248,15 @@ class BaseDataModule(pl.LightningDataModule):
             train_data = self.input_da.sel(self.domains['train'])
 
             # Drop the validation period from the training period
-            try:
-                train_data = train_data.drop_sel(time=xr.date_range(
-                    self.domains['val']['time'].start,
-                    self.domains['val']['time'].stop,
-                ))
-            except KeyError:
-                raise KeyError(
-                    'Validation period cannot be extracted from given training period!'
-                )
+            # try:
+            #     train_data = train_data.drop_sel(time=xr.date_range(
+            #         self.domains['val']['time'].start,
+            #         self.domains['val']['time'].stop,
+            #     ))
+            # except KeyError:
+            #     raise KeyError(
+            #         'Validation period cannot be extracted from given training period!'
+            #     )
 
             self.train_ds = XrDataset(
                 train_data, **self.xrds_kw, postpro_fn=post_fn,
