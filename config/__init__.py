@@ -35,8 +35,10 @@ domains = {
     "ceNATL": dict(lon=[-61, -9], lat=[12, 64]),
     "NATL": dict(lon=[-77, 5], lat=[27, 64]),
     "cNATL": dict(lon=[-51, -9], lat=[32, 54]),
+    "dNATL": dict(lon=[-65, -18], lat=[29, 61]),
     "osmosis": dict(lon=[-22.5, -10.5], lat=[44, 56]),
     "gf": dict(lon=[-66, -54], lat=[32, 44]),
+    "gf15": dict(lon=[-65, -48], lat=[28, 45]),
     "fgf": dict(lon=[-66, -54], lat=[33, 45]),
     "2gf": dict(lon=[-71., -49.], lat=[32, 44]),
     "4gf": dict(lon=[-71., -29.], lat=[32, 44]),
@@ -46,6 +48,8 @@ domains = {
     "canaries_t": dict(lon=[-29, -17], lat=[33, 45]),
     "gre": dict(lon=[-35., -23.], lat=[48., 60.]),
     "mad": dict(lon=[-23., -11.], lat=[32., 44.]),
+    "gre15": dict(lon=[-40., -23.], lat=[48., 65.]),
+    "mad15": dict(lon=[-28., -11.], lat=[28., 45.]),
 }
 
 for n, d in domains.items():
