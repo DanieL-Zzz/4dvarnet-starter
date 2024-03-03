@@ -1,7 +1,7 @@
 import torch
 torch.set_float32_matmul_precision('high')
 
-def base_training(trainer, dm, lit_mod, ckpt=None):
+def base_training(trainer, dm, lit_mod, ckpt='outputs/2024-03-03/18-32-58/base_15x15/checkpoints/val_mse=1.97363-epoch=399.ckpt'):
     if trainer.logger is not None:
         print()
         print("Logdir:", trainer.logger.log_dir)
