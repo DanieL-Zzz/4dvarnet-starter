@@ -1,0 +1,167 @@
+# @package _global_
+
+ckpt: null
+domain: ???  # gf_15x15, gre, mad or cav
+resolution: '1_8'  # '1_20' or '1_8' (apostrophes « ' » are necessary!)
+
+paths:
+  tgt:
+    train: /DATASET/eNATL/eNATL60_BLB002_SSH_nadirs/eNATL60-BLB002-ssh-2009-2010-${resolution}.nc
+    test: /DATASET/NATL/NATL60-CJM165-ssh-2012-2013-${resolution}.nc
+  inp:
+    train: /DATASET/eNATL/eNATL60_BLB002_SSH_nadirs/eNATL60-BLB002-7nadirs-2009-2010-${resolution}.nc
+    test: /DATASET/NATL/NATL60-CJM165-7nadirs-2012-2013-${resolution}.nc
+
+trainer:
+  _target_: pytorch_lightning.Trainer
+  inference_mode: false
+  gradient_clip_val: 0.5
+  accelerator: gpu
+  devices: 1
+  logger:
+    _target_: pytorch_lightning.loggers.tensorboard.TensorBoardLogger
+    save_dir: ${hydra:runtime.output_dir}
+    name: ${hydra:runtime.choices.xp}
+    version: ''
+  max_epochs: 600
+  callbacks:
+    - _target_: pytorch_lightning.callbacks.LearningRateMonitor
+    - _target_: pytorch_lightning.callbacks.ModelCheckpoint
+      monitor: val_mse
+      save_top_k: 3
+      filename: '{val_mse:.5f}-{epoch:03d}'
+
+datamodule:
+  '1_20':
+    patch_dims: {time: 15, lat: 340, lon: 340}
+    patch_strides: {time: 1, lat: 300, lon: 300}
+    rec_weight:
+      crop: {time: 0, lat: 20, lon: 20}
+      offset: 1
+  '1_8':
+    patch_dims: {time: 15, lat: 136, lon: 136}
+    patch_strides: {time: 1, lat: 120, lon: 120}
+    rec_weight:
+      crop: {time: 0, lat: 7, lon: 7}
+      offset: 1
+  aug_kw: {aug_factor: 2, aug_only: true}
+  dl_kw: {batch_size: 4, num_workers: 1}
+
+train_dm:
+  _target_: contrib.transfert.TransfertDataModule
+  input_da:
+    _target_: contrib.transfert.load_and_interpolate
+    tgt_path: ${paths.tgt.train}
+    tgt_var: ssh
+    inp_path: ${paths.inp.train}
+    inp_var: input
+    domain: ${domain.train}
+  domains:
+    train:
+      time: {_target_: builtins.slice, _args_: ['2009-08-12', '2010-06-30']}
+    val:
+      time: {_target_: builtins.slice, _args_: ['2009-07-01', '2009-08-11']}
+    test: null
+  xrds_kw:
+    patch_dims: ${datamodule[${resolution}].patch_dims}
+    strides: ${datamodule[${resolution}].patch_strides}
+    domain_limits: ${domain.train}
+  dl_kw: ${datamodule.dl_kw}
+  aug_kw: ${datamodule.aug_kw}
+
+test_dm:
+  _target_: contrib.transfert.TransfertDataModule
+  input_da:
+    _target_: contrib.transfert.load_and_interpolate
+    tgt_path: ${paths.tgt.test}
+    tgt_var: ssh
+    inp_path: ${paths.inp.test}
+    inp_var: input
+    domain: ${domain.train}
+  domains:
+    train: null
+    val: null
+    test:
+      time: {_target_: builtins.slice, _args_: ['2012-10-01', '2013-09-30']}
+  mean_std_domain: test
+  xrds_kw:
+    patch_dims: ${datamodule[${resolution}].patch_dims}
+    strides: ${datamodule[${resolution}].patch_strides}
+    domain_limits: ${domain.train}
+  dl_kw: ${datamodule.dl_kw}
+  aug_kw: ${datamodule.aug_kw}
+
+model:
+  _target_: src.models.Lit4dVarNet
+  persist_rw: false
+  opt_fn:
+    _target_: contrib.transfert.cosanneal_lr_adamw
+    _partial_: true
+    lr: 1e-3
+    T_max: ${trainer.max_epochs}
+    weight_decay: 1e-3
+  rec_weight:
+    _target_: src.utils.get_triang_time_wei
+    patch_dims: ${datamodule[${resolution}].patch_dims}
+    crop: ${datamodule[${resolution}].rec_weight.crop}
+    offset: ${datamodule[${resolution}].rec_weight.offset}
+  solver:
+    _target_: src.models.GradSolver
+    n_step: 10
+    lr_grad: 1e3
+    prior_cost:
+      _target_: src.models.BilinAEPriorCost
+      dim_in: ${datamodule[${resolution}].patch_dims.time}
+      dim_hidden: 32
+      bilin_quad: false
+      downsamp: 2
+    obs_cost:
+      _target_: src.models.BaseObsCost
+    grad_mod:
+      _target_: src.models.ConvLstmGradModel
+      dim_in: ${datamodule[${resolution}].patch_dims.time}
+      dim_hidden: 48
+  test_metrics: ${metrics.test_metrics}
+  pre_metric_fn:
+    _target_: xarray.Dataset.sel
+    _partial_: True
+    time: {_target_: builtins.slice, _args_: ['2012-10-21', '2013-09-10']}
+    lat: ${domain.test.lat}
+    lon: ${domain.test.lon}
+
+metrics:
+  nrmse_scores: {_target_: src.utils.rmse_based_scores_from_ds, _partial_: true}
+  psd_scores: {_target_: src.utils.psd_based_scores_from_ds, _partial_: true}
+  get0: {_target_: operator.itemgetter, _args_: [0]}
+  get1: {_target_: operator.itemgetter, _args_: [1]}
+  test_metrics:
+    mu:
+      _target_: src.utils.pipe
+      _partial_: true
+      fns: ['${metrics.nrmse_scores}', '${metrics.get0}']
+    sig:
+      _target_: src.utils.pipe
+      _partial_: true
+      fns: ['${metrics.nrmse_scores}', '${metrics.get1}']
+    lx:
+      _target_: src.utils.pipe
+      _partial_: true
+      fns: ['${metrics.psd_scores}', '${metrics.get0}']
+    lt:
+      _target_: src.utils.pipe
+      _partial_: true
+      fns: ['${metrics.psd_scores}', '${metrics.get1}']
+
+entrypoints:
+  - _target_: pytorch_lightning.seed_everything
+    seed: 333
+  - _target_: contrib.transfert.run  # fit + test
+    trainer: ${trainer}
+    lit_mod: ${model}
+    train_dm: ${train_dm}
+    test_dm: ${test_dm}
+    ckpt: ${ckpt}
+
+defaults:
+  - /domain: dNATL
+  - _self_
