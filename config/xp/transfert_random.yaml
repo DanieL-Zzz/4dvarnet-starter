@@ -1,0 +1,11 @@
+# @package _global_
+
+trainer:
+  limit_train_batches: 2400
+
+train_dm:
+  random_sampling: true
+
+defaults:
+  - transfert
+  - _self_

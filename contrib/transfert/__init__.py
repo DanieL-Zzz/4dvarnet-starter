@@ -1,5 +1,7 @@
 """
 """
+from copy import deepcopy
+
 import torch
 import xarray as xr
 
@@ -9,6 +11,7 @@ class TransfertDataModule(BaseDataModule):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.mean_std_domain = kwargs.get('mean_std_domain', 'train')
+        self.random_sampling = kwargs.get('random_sampling', False)
 
     def train_mean_std(self, variable='tgt'):
         train_data = (
@@ -26,8 +29,14 @@ class TransfertDataModule(BaseDataModule):
 
         if stage == 'fit':
             train_data = self.input_da.sel(self.domains['train'])
+            train_xrds_kw = deepcopy(self.xrds_kw)
+
+            if self.random_sampling:
+                train_xrds_kw['strides']['lat'] = 1
+                train_xrds_kw['strides']['lon'] = 1
+
             self.train_ds = XrDataset(
-                train_data, **self.xrds_kw, postpro_fn=post_fn,
+                train_data, **train_xrds_kw, postpro_fn=post_fn,
             )
             if self.aug_kw:
                 self.train_ds = AugmentedDataset(self.train_ds, **self.aug_kw)
