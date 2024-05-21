@@ -30,19 +30,19 @@ params = dict(
     check_full_scan=True,
 )
 
-def trainer(accelerator, devices, **kwargs):
+def trainer(accelerator, devices=1, **kwargs):
     return pl.Trainer(inference_mode=False, accelerator=accelerator, devices=devices)
 
 def solver(config_path, ckpt_path, **kwargs):
     import torch
     model = dz_lit_patch_predict.load_from_cfg(
         config_path,
-        key="model",  
+        key="model",
     )
     ckpt = torch.load(ckpt_path)
     model.load_state_dict(ckpt['state_dict'])
     return model
-    
+
 
 def patcher(input_path, config_path, strides, input_var, check_full_scan, patch_dims_key="datamodule.xrds_kw.patch_dims", **kwargs):
     patches = dz_lit_patch_predict.load_from_cfg(

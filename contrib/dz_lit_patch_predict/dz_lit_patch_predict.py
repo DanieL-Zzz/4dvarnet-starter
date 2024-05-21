@@ -160,6 +160,7 @@ def run(
     if not _skip_val:
         input_validation(input_path=input_path)
     Path(output_dir).mkdir(parents=True, exist_ok=True)  # Make output directory
+    params = vars(params)
 
     log.info("Instantiating Trainer")
     trainer = trainer_fn(**params)
