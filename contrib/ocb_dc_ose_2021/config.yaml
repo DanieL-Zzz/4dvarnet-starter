@@ -1,0 +1,15 @@
+obs:
+- alg
+- h2ag
+- j2g
+- j2n
+- j3
+- s3a
+
+paths:
+  prepared_dir: data/prepared
+  prepared_input_dir: data/prepared/input
+  prepared_ref_dir: data/prepared/ref
+  inference_batches: data/inference/batches
+  method_outputs: data/inference/method_outputs
+  metrics_dir: data/metrics
