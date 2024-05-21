@@ -1,0 +1,197 @@
+schema: '2.0'
+stages:
+  download/obs@alg:
+    cmd: "dvc get -q https://github.com/quentinf00/oost-demo-ssh-dc.git datachallenge/data/prepared/input/alg.nc
+      -o data/prepared/input/alg.nc\n"
+    outs:
+    - path: data/prepared/input/alg.nc
+      hash: md5
+      md5: af7f1e9513afbb5d28b47fc9bc6e4cc5
+      size: 2511317
+  download/obs@h2ag:
+    cmd: "dvc get -q https://github.com/quentinf00/oost-demo-ssh-dc.git datachallenge/data/prepared/input/h2ag.nc
+      -o data/prepared/input/h2ag.nc\n"
+    outs:
+    - path: data/prepared/input/h2ag.nc
+      hash: md5
+      md5: b366217720edf8ac9c5cc2fe90d95daf
+      size: 2324498
+  download/obs@j2g:
+    cmd: "dvc get -q https://github.com/quentinf00/oost-demo-ssh-dc.git datachallenge/data/prepared/input/j2g.nc
+      -o data/prepared/input/j2g.nc\n"
+    outs:
+    - path: data/prepared/input/j2g.nc
+      hash: md5
+      md5: 48e5976a1b6e39f87087d0d6b15f8f5c
+      size: 465237
+  download/obs@j2n:
+    cmd: "dvc get -q https://github.com/quentinf00/oost-demo-ssh-dc.git datachallenge/data/prepared/input/j2n.nc
+      -o data/prepared/input/j2n.nc\n"
+    outs:
+    - path: data/prepared/input/j2n.nc
+      hash: md5
+      md5: c18bf69ae5d543384ce05ee7583cfece
+      size: 720043
+  download/obs@j3:
+    cmd: "dvc get -q https://github.com/quentinf00/oost-demo-ssh-dc.git datachallenge/data/prepared/input/j3.nc
+      -o data/prepared/input/j3.nc\n"
+    outs:
+    - path: data/prepared/input/j3.nc
+      hash: md5
+      md5: 44942ede409cb7de39ad21fb45b04c0d
+      size: 2773941
+  download/obs@s3a:
+    cmd: "dvc get -q https://github.com/quentinf00/oost-demo-ssh-dc.git datachallenge/data/prepared/input/s3a.nc
+      -o data/prepared/input/s3a.nc\n"
+    outs:
+    - path: data/prepared/input/s3a.nc
+      hash: md5
+      md5: 43a9aeb5e60409025150d341457a4b5d
+      size: 2602613
+  download/ref:
+    cmd: "dvc get -q https://github.com/quentinf00/oost-demo-ssh-dc.git datachallenge/data/prepared/ref
+      -o data/prepared/ref\n"
+    outs:
+    - path: data/prepared/ref
+      hash: md5
+      md5: 12668dc5ce651fa086162779b3f50613.dir
+      size: 1589788
+      nfiles: 2
+  concatenate:
+    cmd: "qf_recipe-concat params.input_dir=data/prepared/input params.output_path=data/prepared/concatenated.nc\n"
+    deps:
+    - path: data/prepared/input
+      hash: md5
+      md5: 12fa6173568ea8caa0e84a0cf6da2723.dir
+      size: 11397649
+      nfiles: 6
+    outs:
+    - path: data/prepared/concatenated.nc
+      hash: md5
+      md5: 0188ac7752046ab3077618d6a1852e32
+      size: 11321077
+  grid:
+    cmd: "python scripts/grid.py +input_path=data/prepared/concatenated.nc +output_path=data/prepared/gridded_0.125.nc
+      +resolution=0.125\n"
+    deps:
+    - path: data/prepared/concatenated.nc
+      hash: md5
+      md5: 0188ac7752046ab3077618d6a1852e32
+      size: 11321077
+    params:
+      params.yaml:
+        resolution: 0.125
+    outs:
+    - path: data/prepared/gridded_0.125.nc
+      hash: md5
+      md5: 602992fe8303709efb23049b2f634f7f
+      size: 15790944
+  predict:
+    cmd: "qf_predict_4dvarnet_starter input_path=data/prepared/gridded_0.125.nc output_dir=data/inference/batches/4dvarnet-mad-7nad-1_8
+      params.input_path=data/prepared/gridded_0.125.nc params.config_path=/homes/d22zhu/Lab/4dvarnet-starter/_LOCAL_/config/comfra-MAD-1_8-BM-adapted.yaml
+      params.ckpt_path=/homes/d22zhu/Lab/4dvarnet-starter/_LOCAL_/ckpt/transfert-MAD-1_8-epo-975.ckpt\n"
+    deps:
+    - path: data/prepared/gridded_0.125.nc
+      hash: md5
+      md5: 602992fe8303709efb23049b2f634f7f
+      size: 15790944
+    params:
+      params.yaml:
+        cfg_path: /homes/d22zhu/Lab/4dvarnet-starter/_LOCAL_/config/comfra-MAD-1_8-BM-adapted.yaml
+        ckpt_path: /homes/d22zhu/Lab/4dvarnet-starter/_LOCAL_/ckpt/transfert-MAD-1_8-epo-975.ckpt
+        method: 4dvarnet-mad-7nad-1_8
+        resolution: 0.125
+    outs:
+    - path: data/inference/batches/4dvarnet-mad-7nad-1_8
+      hash: md5
+      md5: 019cfb360da9f8c83214efd935cc47e2.dir
+      size: 233024040
+      nfiles: 414
+  merge:
+    cmd: "python scripts/merge.py +input_directory=data/inference/batches/4dvarnet-mad-7nad-1_8
+      +output_path=data/inference/method_outputs/4dvarnet-mad-7nad-1_8.nc +resolution=0.125
+      hydra.run.dir=. hydra.output_subdir=null hydra/job_logging=disabled hydra/hydra_logging=disabled\n"
+    deps:
+    - path: data/inference/batches/4dvarnet-mad-7nad-1_8
+      hash: md5
+      md5: 019cfb360da9f8c83214efd935cc47e2.dir
+      size: 233024040
+      nfiles: 414
+    params:
+      params.yaml:
+        method: 4dvarnet-mad-7nad-1_8
+        resolution: 0.125
+    outs:
+    - path: data/inference/method_outputs/4dvarnet-mad-7nad-1_8.nc
+      hash: md5
+      md5: 91bfde399dbb74fc170ec65ed9a53285
+      size: 31568917
+  interpolate:
+    cmd: "qf_interp_grid_on_track grid_path=data/inference/method_outputs/4dvarnet-mad-7nad-1_8.nc
+      grid_var=ssh track_path=data/prepared/ref/c2.nc output_path=data/inference/method_outputs/4dvarnet-mad-7nad-1_8_on_c2_track.nc\n"
+    deps:
+    - path: data/inference/method_outputs/4dvarnet-mad-7nad-1_8.nc
+      hash: md5
+      md5: 91bfde399dbb74fc170ec65ed9a53285
+      size: 31568917
+    - path: data/prepared/ref/c2.nc
+      hash: md5
+      md5: 888055307c12551cb187bd39ad1651f4
+      size: 1589781
+    params:
+      params.yaml:
+        method: 4dvarnet-mad-7nad-1_8
+    outs:
+    - path: data/inference/method_outputs/4dvarnet-mad-7nad-1_8_on_c2_track.nc
+      hash: md5
+      md5: a3d62822902e01e52c7c33379eb669c0
+      size: 1581792
+  metrics/mu:
+    cmd: "dz_alongtrack_mu ref_path=data/prepared/ref/c2.nc study_path=data/inference/method_outputs/4dvarnet-mad-7nad-1_8_on_c2_track.nc
+      study_var=ssh output_path=data/metrics/mu_4dvarnet-mad-7nad-1_8.json\n"
+    deps:
+    - path: data/inference/method_outputs/4dvarnet-mad-7nad-1_8_on_c2_track.nc
+      hash: md5
+      md5: a3d62822902e01e52c7c33379eb669c0
+      size: 1581792
+    - path: data/prepared/ref/c2.nc
+      hash: md5
+      md5: 888055307c12551cb187bd39ad1651f4
+      size: 1589781
+    params:
+      params.yaml:
+        method: 4dvarnet-mad-7nad-1_8
+    outs:
+    - path: data/metrics/mu_4dvarnet-mad-7nad-1_8.json
+      hash: md5
+      md5: 14035edadd89860eb2e4257ced520655
+      size: 30
+  metrics/lx:
+    cmd: "alongtrack_lambdax ref_path=data/prepared/ref/c2.nc study_path=data/inference/method_outputs/4dvarnet-mad-7nad-1_8_on_c2_track.nc
+      study_var=ssh output_lambdax_path=data/metrics/lambdax_4dvarnet-mad-7nad-1_8.json
+      output_psd_path=data/inference/method_outputs/4dvarnet-mad-7nad-1_8_psd.nc\n"
+    deps:
+    - path: data/inference/method_outputs/4dvarnet-mad-7nad-1_8_on_c2_track.nc
+      hash: md5
+      md5: a3d62822902e01e52c7c33379eb669c0
+      size: 1581792
+    - path: data/prepared/ref/c2.nc
+      hash: md5
+      md5: 888055307c12551cb187bd39ad1651f4
+      size: 1589781
+    params:
+      params.yaml:
+        method: 4dvarnet-mad-7nad-1_8
+    outs:
+    - path: data/inference/method_outputs/4dvarnet-mad-7nad-1_8_psd.nc
+      hash: md5
+      md5: 1aa693044a5ca37db3b151a471139cea
+      size: 8942
+    - path: data/metrics/lambdax_4dvarnet-mad-7nad-1_8.json
+      hash: md5
+      md5: 64fd5aa8078c7033019e7d73eb36cbd8
+      size: 36
+  leaderboard/show:
+    cmd: dvc metrics show --json | python scripts/metrics.py
+  leaderboard:
+    cmd: dvc metrics show --json | python scripts/metrics.py
