@@ -1,0 +1,15 @@
+# @package _global_
+
+paths:
+  natl_gf_5nads: /DATASET/NATL/natl_gf_w_5nadirs.nc
+
+model:
+  _target_: contrib.coresolver.LitCoreVarNet
+  solver:
+    _target_: contrib.coresolver.CoreGradSolver
+    n_step: 5
+  n_repeat: 2
+
+defaults:
+  - base.yaml
+  - _self_
