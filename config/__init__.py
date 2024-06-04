@@ -44,6 +44,8 @@ domains = {
     "qnatl": dict(lon=[-77., 0.], lat=[27., 64.]),
     "canaries": dict(lon=[-31, -14], lat=[33, 46]),
     "canaries_t": dict(lon=[-29, -17], lat=[33, 45]),
+    "gre": dict(lon=[-35., -23.], lat=[48., 60.]),
+    "mad": dict(lon=[-23., -11.], lat=[32., 44.]),
 }
 
 for n, d in domains.items():

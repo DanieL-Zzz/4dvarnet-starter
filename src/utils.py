@@ -168,8 +168,8 @@ def load_dc_data(**kwargs):
 
 
 def load_full_natl_data(
-        path_obs="../sla-data-registry/CalData/cal_data_new_errs.nc",
-        path_gt="../sla-data-registry/NATL60/NATL/ref_new/NATL60-CJM165_NATL_ssh_y2013.1y.nc",
+        path_obs="/DATASET/NATL/cal_data_new_errs.nc",
+        path_gt="/DATASET/NATL/NATL60-CJM165_NATL_ssh_y2013.1y.nc",
         obs_var='five_nadirs',
         gt_var='ssh',
         **kwargs
@@ -177,7 +177,7 @@ def load_full_natl_data(
     inp = xr.open_dataset(path_obs)[obs_var]
     gt = (
         xr.open_dataset(path_gt)[gt_var]
-        # .isel(time=slice(0, -1))
+        .isel(time=slice(0, -1))
         .sel(lat=inp.lat, lon=inp.lon, method="nearest")
     )
 
