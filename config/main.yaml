@@ -1,6 +1,9 @@
 entrypoints: ???
 hydra:
-  searchpath: 
+  callbacks:
+    LogJobReturnCallback:
+      _target_: hydra.experimental.callbacks.LogJobReturnCallback
+  searchpath:
     - pkg://config
     - pkg://contrib
 defaults:
