@@ -1,0 +1,14 @@
+# @package _global_
+
+trainer:
+  max_epochs: 600
+
+model:
+  _target_: contrib.equivariant.LitEquivariant4dVarNet
+  bounds:
+  - 1.25
+  - 0.75
+
+defaults:
+  - base
+  - _self_
