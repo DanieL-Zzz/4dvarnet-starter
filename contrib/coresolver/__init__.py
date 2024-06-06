@@ -28,12 +28,7 @@ class LitCoreVarNet(Lit4dVarNet):
             state = out.detach().requires_grad_(True)
 
         if self.training:
-            loss = 2*torch.stack(losses).sum() - losses[0]
-            # loss = torch.stack(losses).sum()
-            # loss = (
-            #     torch.stack(losses).squeeze()
-            #     * torch.linspace(.5, 1., self.n_repeat, device=losses[0].device)
-            # ).sum()
+            loss = torch.stack(losses).sum()
         else:
             loss = losses[-1]
 
@@ -68,5 +63,3 @@ class CoreGradSolver(GradSolver):
             state = self.prior_cost.forward_ae(state)
 
         return state
-
-
