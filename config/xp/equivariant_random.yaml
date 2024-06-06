@@ -10,5 +10,5 @@ model:
   - 0.75
 
 defaults:
-  - transfert
+  - transfert_random
   - _self_
