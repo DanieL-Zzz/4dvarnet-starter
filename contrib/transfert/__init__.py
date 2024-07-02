@@ -95,4 +95,4 @@ def run(trainer, train_dm, test_dm, lit_mod, ckpt=None):
         print()
 
     trainer.fit(lit_mod, datamodule=train_dm, ckpt_path=ckpt)
-    trainer.test(lit_mod, datamodule=test_dm, ckpt_path='best')
+    # trainer.test(lit_mod, datamodule=test_dm, ckpt_path='best')

@@ -1,5 +1,10 @@
 # @package _global_
 
+hydra:
+  callbacks:
+    LogJobReturnCallback:
+      _target_: hydra.experimental.callbacks.LogJobReturnCallback
+
 ckpt: null
 domain: ???  # gf_15x15, gre, mad or cav
 resolution: '1_8'  # '1_20' or '1_8' (apostrophes « ' » are necessary!)
@@ -47,7 +52,7 @@ datamodule:
       crop: {time: 0, lat: 7, lon: 7}
       offset: 1
   aug_kw: {aug_factor: 2, aug_only: true}
-  dl_kw: {batch_size: 4, num_workers: 1}
+  dl_kw: {batch_size: 32, num_workers: 1}
 
 train_dm:
   _target_: contrib.transfert.TransfertDataModule
@@ -165,5 +170,5 @@ entrypoints:
     ckpt: ${ckpt}
 
 defaults:
-  - /domain: dNATL
+  - /domain: mad15
   - _self_
