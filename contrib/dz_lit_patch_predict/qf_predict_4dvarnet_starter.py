@@ -30,7 +30,7 @@ params = dict(
     check_full_scan=True,
 )
 
-def trainer(accelerator, devices=1, **kwargs):
+def trainer(accelerator, devices=-1, **kwargs):
     return pl.Trainer(inference_mode=False, accelerator=accelerator, devices=devices)
 
 def solver(config_path, ckpt_path, **kwargs):
@@ -52,8 +52,8 @@ def patcher(input_path, config_path, strides, input_var, check_full_scan, patch_
         )
     patcher = xrpatcher.XRDAPatcher(
         da=xr.open_dataset(input_path)[input_var],
-        patches=patches,
-        strides=strides,
+        patches=dict(time=15, lat=112, lon=96),
+        strides=dict(time=1, lat=96, lon=80),
         check_full_scan=check_full_scan,
     )
     return patcher

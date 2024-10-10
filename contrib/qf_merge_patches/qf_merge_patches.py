@@ -53,9 +53,11 @@ def triang(n, min=0.05):
 
 
 def crop(n, crop=20):
-    w = np.zeros(n)
-    w[crop:-crop] = 1.0
-    return w
+    if crop:
+        w = np.zeros(n)
+        w[crop:-crop] = 1.0
+        return w
+    return np.ones(n)
 
 
 def build_weight(patch_dims, dim_weights=dict(time=triang, lat=crop, lon=crop)):

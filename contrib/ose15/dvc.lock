@@ -1,0 +1,404 @@
+schema: '2.0'
+stages:
+  download/obs@j2n:
+    cmd: "dz_download_ssh_tracks sat=j2n download_dir=data/prepared/input/j2n min_time=2017-09-01
+      max_time=2017-09-30\n"
+    outs:
+    - path: data/prepared/input/j2n
+      hash: md5
+      md5: d751713988987e9331980363e24189ce.dir
+      size: 0
+      nfiles: 0
+  download/obs@j3:
+    cmd: "dz_download_ssh_tracks sat=j3 download_dir=data/prepared/input/j3 min_time=2017-09-01
+      max_time=2017-09-30\n"
+    outs:
+    - path: data/prepared/input/j3
+      hash: md5
+      md5: d548159438c642d4ef645f98663da629.dir
+      size: 15328717
+      nfiles: 30
+  download/obs@s3a:
+    cmd: "dz_download_ssh_tracks sat=s3a download_dir=data/prepared/input/s3a min_time=2017-09-01
+      max_time=2017-09-30\n"
+    outs:
+    - path: data/prepared/input/s3a
+      hash: md5
+      md5: 3cb160b053507bea1f27ed3b5226f7e5.dir
+      size: 14504899
+      nfiles: 30
+  download/obs@j2g:
+    cmd: "dz_download_ssh_tracks sat=j2g download_dir=data/prepared/input/j2g min_time=2017-09-01
+      max_time=2017-09-30\n"
+    outs:
+    - path: data/prepared/input/j2g
+      hash: md5
+      md5: 09249d9695f1731238463eee253359c4.dir
+      size: 7384636
+      nfiles: 14
+  download/ref:
+    cmd: "dz_download_ssh_tracks sat=c2 download_dir=data/prepared/ref/c2 min_time=2017-09-01
+      max_time=2017-09-30\n"
+    outs:
+    - path: data/prepared/ref/c2
+      hash: md5
+      md5: a4538588640e2b68caf9466145fffcab.dir
+      size: 14312023
+      nfiles: 30
+  download/obs@h2ag:
+    cmd: "dz_download_ssh_tracks sat=h2ag download_dir=data/prepared/input/h2ag min_time=2017-09-01
+      max_time=2017-09-30\n"
+    outs:
+    - path: data/prepared/input/h2ag
+      hash: md5
+      md5: 1b1f77acb65e811f1358f0fc4999c13b.dir
+      size: 14956811
+      nfiles: 30
+  download/obs@alg:
+    cmd: "dz_download_ssh_tracks sat=alg download_dir=data/prepared/input/alg min_time=2017-09-01
+      max_time=2017-09-30\n"
+    outs:
+    - path: data/prepared/input/alg
+      hash: md5
+      md5: c1db62028539fe7c2eff340b2b4c77e8.dir
+      size: 14570996
+      nfiles: 30
+  processing/obs@j2n:
+    cmd: "qf_filter_merge_daily_ssh_tracks input_dir=data/prepared/input/j2n output_path=data/prepared/processed/j2n.nc
+      min_lon=-180.0 min_lat=-90.0 max_lon=180.0 max_lat=90.0 min_time=2016-12-01
+      max_time=2018-02-01\n"
+    deps:
+    - path: data/prepared/input/j2n
+      hash: md5
+      md5: c362563b0c734fe15e964e2d0e9c4162.dir
+      size: 57152450
+      nfiles: 110
+    outs:
+    - path: data/prepared/processed/j2n.nc
+      hash: md5
+      md5: 43f915249b0c42e9249496088303596b
+      size: 180715755
+  processing/obs@s3a:
+    cmd: "qf_filter_merge_daily_ssh_tracks input_dir=/DATASET/ssh-global-ose-2019/data/alongtrack/s3a
+      output_path=/DATASET/ssh-global-ose-2019/data/processed/s3a.nc min_lon=-180.0
+      min_lat=-90.0 max_lon=180.0 max_lat=90.0 min_time=2018-12-01 max_time=2020-02-01\n"
+    deps:
+    - path: /DATASET/ssh-global-ose-2019/data/alongtrack/s3a
+      hash: md5
+      md5: 7d409374d73ae365e77825390b20b384.dir
+      size: 527312906
+      nfiles: 1096
+    outs:
+    - path: /DATASET/ssh-global-ose-2019/data/processed/s3a.nc
+      hash: md5
+      md5: e63a7cac3b243a9e7e558332183492f0
+      size: 626633781
+  processing/obs@alg:
+    cmd: "qf_filter_merge_daily_ssh_tracks input_dir=data/prepared/input/alg output_path=data/prepared/processed/alg.nc
+      min_lon=-180.0 min_lat=-90.0 max_lon=180.0 max_lat=90.0 min_time=2017-09-01
+      max_time=2017-09-30\n"
+    deps:
+    - path: data/prepared/input/alg
+      hash: md5
+      md5: c1db62028539fe7c2eff340b2b4c77e8.dir
+      size: 14570996
+      nfiles: 30
+    outs:
+    - path: data/prepared/processed/alg.nc
+      hash: md5
+      md5: a0c2cd1c9281413d74b61e29ea0f77f6
+      size: 42013781
+  processing/obs@h2ag:
+    cmd: "qf_filter_merge_daily_ssh_tracks input_dir=/DATASET/ssh-global-ose-2019/data/alongtrack/h2ag
+      output_path=/DATASET/ssh-global-ose-2019/data/processed/h2ag.nc min_lon=-180.0
+      min_lat=-90.0 max_lon=180.0 max_lat=90.0 min_time=2018-12-01 max_time=2020-02-01\n"
+    deps:
+    - path: /DATASET/ssh-global-ose-2019/data/alongtrack/h2ag
+      hash: md5
+      md5: 234122a7d301936056202a42c01aa0b3.dir
+      size: 391897062
+      nfiles: 852
+    outs:
+    - path: /DATASET/ssh-global-ose-2019/data/processed/h2ag.nc
+      hash: md5
+      md5: 06d7fa6de6845e47a4786300d6178ae1
+      size: 546527605
+  processing/obs@j3:
+    cmd: "qf_filter_merge_daily_ssh_tracks input_dir=/DATASET/ssh-global-ose-2019/data/alongtrack/j3
+      output_path=/DATASET/ssh-global-ose-2019/data/processed/j3.nc min_lon=-180.0
+      min_lat=-90.0 max_lon=180.0 max_lat=90.0 min_time=2018-12-01 max_time=2020-02-01\n"
+    deps:
+    - path: /DATASET/ssh-global-ose-2019/data/alongtrack/j3
+      hash: md5
+      md5: 07403eaa9a94dffe7100f587eb5a6c46.dir
+      size: 562068038
+      nfiles: 1066
+    outs:
+    - path: /DATASET/ssh-global-ose-2019/data/processed/j3.nc
+      hash: md5
+      md5: 2b84101223cb1054708faf4ebe6412c0
+      size: 658070901
+  processing/ref:
+    cmd: "qf_filter_merge_daily_ssh_tracks input_dir=data/prepared/ref/c2 output_path=data/prepared/ref/c2.nc
+      min_lon=-180.0 min_lat=-90.0 max_lon=180.0 max_lat=90.0 min_time=2017-09-01
+      max_time=2017-09-30\n"
+    deps:
+    - path: data/prepared/ref/c2
+      hash: md5
+      md5: a4538588640e2b68caf9466145fffcab.dir
+      size: 14312023
+      nfiles: 30
+    outs:
+    - path: data/prepared/ref/c2.nc
+      hash: md5
+      md5: d8c07a9cd0c4e0a336f3f16c46a5b88e
+      size: 44083029
+  processing/obs@j2g:
+    cmd: "qf_filter_merge_daily_ssh_tracks input_dir=data/prepared/input/j2g output_path=data/prepared/processed/j2g.nc
+      min_lon=-180.0 min_lat=-90.0 max_lon=180.0 max_lat=90.0 min_time=2017-09-01
+      max_time=2017-09-30\n"
+    deps:
+    - path: data/prepared/input/j2g
+      hash: md5
+      md5: 09249d9695f1731238463eee253359c4.dir
+      size: 7384636
+      nfiles: 14
+    outs:
+    - path: data/prepared/processed/j2g.nc
+      hash: md5
+      md5: 82aea0c5f91eee0c47473ea664a158c5
+      size: 22061877
+  processing@alg:
+    cmd: "qf_filter_merge_daily_ssh_tracks input_dir=data/prepared/input/alg output_path=data/prepared/processed/alg.nc
+      min_lon=-40.0 min_lat=48.0 max_lon=-23.0 max_lat=65.0\n"
+    deps:
+    - path: data/prepared/input/alg
+      hash: md5
+      md5: 44864d412e1dbab7562aab3982dcda99.dir
+      size: 174362573
+      nfiles: 365
+    outs:
+    - path: data/prepared/processed/alg.nc
+      hash: md5
+      md5: ffd29c1bf724f2d517d20a03c1f852d6
+      size: 4466805
+  processing@h2ag:
+    cmd: "qf_filter_merge_daily_ssh_tracks input_dir=data/prepared/input/h2ag output_path=data/prepared/processed/h2ag.nc
+      min_lon=-40.0 min_lat=48.0 max_lon=-23.0 max_lat=65.0\n"
+    deps:
+    - path: data/prepared/input/h2ag
+      hash: md5
+      md5: 77bf44b7253e2d7968e50101bfd03ca3.dir
+      size: 159268144
+      nfiles: 342
+    outs:
+    - path: data/prepared/processed/h2ag.nc
+      hash: md5
+      md5: 04a0f93cfb4dbfa2e6ee2c16198c1f72
+      size: 3971794
+  processing@j2g:
+    cmd: "qf_filter_merge_daily_ssh_tracks input_dir=data/prepared/input/j2g output_path=data/prepared/processed/j2g.nc
+      min_lon=-40.0 min_lat=48.0 max_lon=-23.0 max_lat=65.0\n"
+    deps:
+    - path: data/prepared/input/j2g
+      hash: md5
+      md5: fa0c07ef89946f75f8c3e70e097a4f95.dir
+      size: 35978027
+      nfiles: 66
+    outs:
+    - path: data/prepared/processed/j2g.nc
+      hash: md5
+      md5: 013e63912088e46fa255b134174c5d01
+      size: 1301109
+  processing@j2n:
+    cmd: "qf_filter_merge_daily_ssh_tracks input_dir=data/prepared/input/j2n output_path=data/prepared/processed/j2n.nc
+      min_lon=-40.0 min_lat=48.0 max_lon=-23.0 max_lat=65.0\n"
+    deps:
+    - path: data/prepared/input/j2n
+      hash: md5
+      md5: 0a8ec10f8e0e378fd4bd13b8bba3171b.dir
+      size: 41154265
+      nfiles: 79
+    outs:
+    - path: data/prepared/processed/j2n.nc
+      hash: md5
+      md5: 0ca7a707f44d2eaddd05bb05ae8841db
+      size: 1462795
+  concatenate:
+    cmd: "qf_recipe-concat params.input_dir=/DATASET/ssh-global-ose-2019/processed
+      params.output_path=/DATASET/ssh-global-ose-2019/gridded/conc_global.nc\n"
+    deps:
+    - path: /DATASET/ssh-global-ose-2019/processed
+      hash: md5
+      md5: 3cdb236388772c51cc2ff5890b2ce510.dir
+      size: 3123842910
+      nfiles: 6
+    outs:
+    - path: /DATASET/ssh-global-ose-2019/gridded/conc_global.nc
+      hash: md5
+      md5: f68df26d6f265ef809b38e6f22214ccc
+      size: 3123766325
+  grid:
+    cmd: "python scripts/grid.py +input_path=/DATASET/ssh-global-ose-2019/gridded/conc_global.nc
+      +output_path=/DATASET/ssh-global-ose-2019/gridded/grid_global_0.125.nc +resolution=0.125
+      +min_lon=-180.0 +max_lon=180.0 +min_lat=-90.0 +max_lat=90.0 +min_time=2018-12-01
+      +max_time=2020-02-01\n"
+    deps:
+    - path: /DATASET/ssh-global-ose-2019/gridded/conc_global.nc
+      hash: md5
+      md5: f68df26d6f265ef809b38e6f22214ccc
+      size: 3123766325
+    params:
+      params.yaml:
+        res: 0.125
+    outs:
+    - path: /DATASET/ssh-global-ose-2019/gridded/grid_global_0.125.nc
+      hash: md5
+      md5: 242dfbed5b1ca11183938bdd962a2ef5
+      size: 7100052576
+  predict:
+    cmd: "qf_predict_4dvarnet_starter input_path=/DATASET/ssh-global-ose-2019/L4/grid_global_0.125.nc
+      output_dir=data/inference/batches/4dvarnet-dnatl-7nad-1_8 params.input_path=/DATASET/ssh-global-ose-2019/L4/continuous_grid_global_0.125.nc
+      params.config_path=/homes/d22zhu/Lab/4dvarnet-starter/_LOCAL_/config/comfra-GF-15x15-1_8-BM-adapted_15x15.yaml
+      params.ckpt_path=/homes/d22zhu/Lab/4dvarnet-starter/outputs/transfert/dNATL-transfert-01-22-08/transfert/checkpoints/best.ckpt\n"
+    params:
+      params.yaml:
+        cfg_path: 
+          /homes/d22zhu/Lab/4dvarnet-starter/_LOCAL_/config/comfra-GF-15x15-1_8-BM-adapted_15x15.yaml
+        ckpt_path: 
+          /homes/d22zhu/Lab/4dvarnet-starter/outputs/transfert/dNATL-transfert-01-22-08/transfert/checkpoints/best.ckpt
+        method: 4dvarnet-dnatl-7nad-1_8
+        res: 0.125
+    outs:
+    - path: data/inference/batches/4dvarnet-dnatl-7nad-1_8
+      hash: md5
+      md5: 49136b7544bd798a9c80504f047aa48a.dir
+      size: 12879982741
+      nfiles: 1
+  merge:
+    cmd: "python scripts/merge.py +input_directory=data/inference/batches/a-rd-4dvarnet-dnatl-7nad-1_8
+      +output_path=data/inference/method_outputs/a-rd-4dvarnet-dnatl-7nad-1_8.nc +resolution=0.125
+      +min_lon=-180.0 +max_lon=180.0 +min_lat=-90.0 +max_lat=90.0 +min_time=2018-12-01
+      +max_time=2020-02-01 hydra.run.dir=. hydra.output_subdir=null hydra/job_logging=disabled
+      hydra/hydra_logging=disabled\n"
+    params:
+      params.yaml:
+        method: a-rd-4dvarnet-dnatl-7nad-1_8
+        res: 0.125
+    outs:
+    - path: data/inference/method_outputs/a-rd-4dvarnet-dnatl-7nad-1_8.nc
+      hash: md5
+      md5: 1f62d05e2b28f999749d06bfa822e39a
+      size: 14200058645
+  interpolate:
+    cmd: "qf_interp_grid_on_track grid_path=data/inference/method_outputs/a-rd-4dvarnet-dnatl-7nad-1_8.nc
+      grid_var=ssh track_path=data/prepared/ref/c2.nc output_path=data/inference/method_outputs/a-rd-4dvarnet-dnatl-7nad-1_8_on_c2_track.nc\n"
+    deps:
+    - path: data/inference/method_outputs/a-rd-4dvarnet-dnatl-7nad-1_8.nc
+      hash: md5
+      md5: 4412d5763874565cc00eed3d00da3c5c
+      size: 995372469
+    - path: data/prepared/ref/c2.nc
+      hash: md5
+      md5: d8c07a9cd0c4e0a336f3f16c46a5b88e
+      size: 44083029
+    params:
+      params.yaml:
+        method: a-rd-4dvarnet-dnatl-7nad-1_8
+    outs:
+    - path: data/inference/method_outputs/a-rd-4dvarnet-dnatl-7nad-1_8_on_c2_track.nc
+      hash: md5
+      md5: 357043fce140c55cf046e72887a7be2e
+      size: 44075040
+  metrics/mu:
+    cmd: "dz_alongtrack_mu ref_path=data/prepared/ref/c2.nc study_path=data/inference/method_outputs/a-rd-4dvarnet-dnatl-7nad-1_8_on_c2_track.nc
+      study_var=ssh output_path=data/metrics/mu_a-rd-4dvarnet-dnatl-7nad-1_8.json\n"
+    deps:
+    - path: data/inference/method_outputs/a-rd-4dvarnet-dnatl-7nad-1_8_on_c2_track.nc
+      hash: md5
+      md5: 357043fce140c55cf046e72887a7be2e
+      size: 44075040
+    - path: data/prepared/ref/c2.nc
+      hash: md5
+      md5: d8c07a9cd0c4e0a336f3f16c46a5b88e
+      size: 44083029
+    params:
+      params.yaml:
+        method: a-rd-4dvarnet-dnatl-7nad-1_8
+    outs:
+    - path: data/metrics/mu_a-rd-4dvarnet-dnatl-7nad-1_8.json
+      hash: md5
+      md5: c6dc9bae63ed3ef3fba52db3018173b3
+      size: 30
+  metrics/lx:
+    cmd: "alongtrack_lambdax ref_path=data/prepared/ref/c2.nc study_path=data/inference/method_outputs/a-rd-4dvarnet-dnatl-7nad-1_8_on_c2_track.nc
+      study_var=ssh output_lambdax_path=data/metrics/lambdax_a-rd-4dvarnet-dnatl-7nad-1_8.json
+      output_psd_path=data/inference/method_outputs/a-rd-4dvarnet-dnatl-7nad-1_8_psd.nc\n"
+    deps:
+    - path: data/inference/method_outputs/a-rd-4dvarnet-dnatl-7nad-1_8_on_c2_track.nc
+      hash: md5
+      md5: 357043fce140c55cf046e72887a7be2e
+      size: 44075040
+    - path: data/prepared/ref/c2.nc
+      hash: md5
+      md5: d8c07a9cd0c4e0a336f3f16c46a5b88e
+      size: 44083029
+    params:
+      params.yaml:
+        method: a-rd-4dvarnet-dnatl-7nad-1_8
+    outs:
+    - path: data/inference/method_outputs/a-rd-4dvarnet-dnatl-7nad-1_8_psd.nc
+      hash: md5
+      md5: a6bfed64b26a903f322f817331057166
+      size: 8942
+    - path: data/metrics/lambdax_a-rd-4dvarnet-dnatl-7nad-1_8.json
+      hash: md5
+      md5: ad0ba66609e062c24f5a1506f8d72ddc
+      size: 36
+  leaderboard:
+    cmd: dvc metrics show --json | python scripts/metrics.py
+  processing/obs@s3b:
+    cmd: "qf_filter_merge_daily_ssh_tracks input_dir=/DATASET/ssh-global-ose-2019/data/alongtrack/s3b
+      output_path=/DATASET/ssh-global-ose-2019/data/processed/s3b.nc min_lon=-180.0
+      min_lat=-90.0 max_lon=180.0 max_lat=90.0 min_time=2018-12-01 max_time=2020-02-01\n"
+    deps:
+    - path: /DATASET/ssh-global-ose-2019/data/alongtrack/s3b
+      hash: md5
+      md5: 4affec4893e8e2c632fb53be78e00ef1.dir
+      size: 368507599
+      nfiles: 766
+    outs:
+    - path: /DATASET/ssh-global-ose-2019/data/processed/s3b.nc
+      hash: md5
+      md5: b6ade1e3a23243250b8e4c871d78acb3
+      size: 625193077
+  processing/obs@h2b:
+    cmd: "qf_filter_merge_daily_ssh_tracks input_dir=/DATASET/ssh-global-ose-2019/data/alongtrack/h2b
+      output_path=/DATASET/ssh-global-ose-2019/data/processed/h2b.nc min_lon=-180.0
+      min_lat=-90.0 max_lon=180.0 max_lat=90.0 min_time=2018-12-01 max_time=2020-02-01\n"
+    deps:
+    - path: /DATASET/ssh-global-ose-2019/data/alongtrack/h2b
+      hash: md5
+      md5: 8543170f0f9f6eb8569bfbc4c08b05d2.dir
+      size: 135107583
+      nfiles: 294
+    outs:
+    - path: /DATASET/ssh-global-ose-2019/data/processed/h2b.nc
+      hash: md5
+      md5: 6b831e62ead26bb8c32d73482d868bbf
+      size: 29662421
+  processing/obs@c2:
+    cmd: "qf_filter_merge_daily_ssh_tracks input_dir=/DATASET/ssh-global-ose-2019/data/alongtrack/c2
+      output_path=/DATASET/ssh-global-ose-2019/data/processed/c2.nc min_lon=-180.0
+      min_lat=-90.0 max_lon=180.0 max_lat=90.0 min_time=2018-12-01 max_time=2020-02-01\n"
+    deps:
+    - path: /DATASET/ssh-global-ose-2019/data/alongtrack/c2
+      hash: md5
+      md5: a17b7f3cca404e4b7432037e00be9cbb.dir
+      size: 440433422
+      nfiles: 942
+    outs:
+    - path: /DATASET/ssh-global-ose-2019/data/processed/c2.nc
+      hash: md5
+      md5: 593354c6434f3eb8dc7341b043eb248e
+      size: 637755125

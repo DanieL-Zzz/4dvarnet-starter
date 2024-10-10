@@ -1,0 +1,14 @@
+# @package _global_
+
+trainer:
+  limit_train_batches: 75
+
+train_dm:
+  random_sampling: true
+
+model:
+  _target_: contrib.transfert.PatchNormLit4dVarNet
+
+defaults:
+  - transfert
+  - _self_

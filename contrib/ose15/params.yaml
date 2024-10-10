@@ -1,0 +1,82 @@
+# 4DVarNet-GF 1/20°
+# method: 4dvarnet-gf-7nad-1_20
+# res: .05
+# cfg_path:
+#   /homes/d22zhu/Lab/4dvarnet-starter/_LOCAL_/config/comfra-GF-15x15-1_20-BM-adapted_15x15.yaml
+# ckpt_path:
+#   /homes/d22zhu/Lab/4dvarnet-starter/_LOCAL_/ckpt/comfra-GF-15x15-1_20-BM-epo-978.ckpt
+
+# # 4DVarNet-GF 1/8°
+# method: 4dvarnet-gf-7nad-1_8
+# res: .125
+# cfg_path:
+#   /homes/d22zhu/Lab/4dvarnet-starter/_LOCAL_/config/comfra-GF-15x15-1_8-BM-adapted_15x15.yaml
+# ckpt_path:
+#   /homes/d22zhu/Lab/4dvarnet-starter/_LOCAL_/ckpt/comfra-GF-15x15-1_8-BM-epo-861.ckpt
+
+# # 4DVarNet-GRE 1/8°
+# method: 4dvarnet-gre-7nad-1_8
+# res: .125
+# cfg_path:
+#   /homes/d22zhu/Lab/4dvarnet-starter/_LOCAL_/config/comfra-GRE-1_8-BM-adapted_15x15.yaml
+# ckpt_path:
+#   /homes/d22zhu/Lab/4dvarnet-starter/_LOCAL_/ckpt/transfert-GRE-1_8-epo-972.ckpt
+
+# 4DVarNet-MAD 1/8°
+# method: 4dvarnet-mad-7nad-1_8
+# res: .125
+# cfg_path:
+#   /homes/d22zhu/Lab/4dvarnet-starter/_LOCAL_/config/comfra-MAD-1_8-BM-adapted_15x15.yaml
+# ckpt_path:
+#   /homes/d22zhu/Lab/4dvarnet-starter/_LOCAL_/ckpt/transfert-MAD-1_8-epo-975.ckpt
+
+# a-4DVarNet-GF 1/8°
+# method: a-4dvarnet-GF-7nad-1_8
+# res: .125
+# cfg_path:
+#     /homes/d22zhu/Lab/4dvarnet-starter/_LOCAL_/config/comfra-GF-15x15-1_8-BM-adapted_15x15.yaml
+# ckpt_path:
+#     /homes/d22zhu/Lab/4dvarnet-starter/outputs/equivariant/GF15-equivariant-21-12-25/equivariant/checkpoints/best.ckpt
+
+# a-4DVarNet-GRE 1/8°
+# method: a-4dvarnet-GRE-7nad-1_8
+# res: .125
+# cfg_path:
+#     /homes/d22zhu/Lab/4dvarnet-starter/_LOCAL_/config/comfra-GRE-1_8-BM-adapted_15x15.yaml
+# ckpt_path:
+#     /homes/d22zhu/Lab/4dvarnet-starter/outputs/equivariant/GRE15-equivariant-21-13-08/equivariant/checkpoints/best.ckpt
+
+# a-4DVarNet-MAD 1/8°
+# method: a-4dvarnet-MAD-7nad-1_8
+# res: .125
+# cfg_path:
+#     /homes/d22zhu/Lab/4dvarnet-starter/_LOCAL_/config/comfra-MAD-1_8-BM-adapted_15x15.yaml
+# ckpt_path:
+#     /homes/d22zhu/Lab/4dvarnet-starter/outputs/equivariant/MAD15-equivariant-21-14-01/equivariant/checkpoints/best.ckpt
+
+# 4DVarNet-dNATL 1/8°
+method: 4dvarnet-dnatl-7nad-1_8
+res: .125
+cfg_path:
+    /homes/d22zhu/Lab/4dvarnet-starter/_LOCAL_/config/comfra-GF-15x15-1_8-BM-adapted_15x15.yaml
+ckpt_path:
+    /homes/d22zhu/Lab/4dvarnet-starter/outputs/transfert/dNATL-transfert-01-22-08/transfert/checkpoints/best.ckpt
+
+# RD-4DVarNet-dNATL 1/8°
+# method: rd-4dvarnet-dnatl-7nad-1_8
+# res: .125
+# cfg_path:
+#     /homes/d22zhu/Lab/4dvarnet-starter/_LOCAL_/config/comfra-GF-15x15-1_8-BM-adapted_15x15.yaml
+# ckpt_path:
+#     /homes/d22zhu/Lab/4dvarnet-starter/outputs/transfert/dNATL-transfert-random-01-16-52/transfert_random/checkpoints/best.ckpt
+
+# a-RD-4DVarNet-dNATL 1/8°
+# method: a-rd-4dvarnet-dnatl-7nad-1_8
+# res: .125
+# cfg_path:
+#     /homes/d22zhu/Lab/4dvarnet-starter/_LOCAL_/config/comfra-GF-15x15-1_8-BM-adapted_15x15.yaml
+# ckpt_path:
+#     /homes/d22zhu/Lab/4dvarnet-starter/outputs/equivariant/dNATL-equivariant-random-01-17-10/equivariant_random/checkpoints/best.ckpt
+
+# method: oi_mad15
+# res: .125

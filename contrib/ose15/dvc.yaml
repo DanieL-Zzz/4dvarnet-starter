@@ -1,0 +1,175 @@
+vars:
+- config.yaml:obs,ref,domain,period,paths
+
+stages:
+  # download/ref:
+  #   cmd: >
+  #     dz_download_ssh_tracks sat=${ref}
+  #     download_dir=${paths.prepared_ref_dir}/${ref}
+  #   outs:
+  #   - ${paths.prepared_ref_dir}/${ref}:
+  #       cache: false
+
+  # processing/ref:
+  #   cmd: >
+  #     qf_filter_merge_daily_ssh_tracks
+  #     input_dir=${paths.prepared_ref_dir}/${ref}
+  #     output_path=${paths.prepared_ref_dir}/${ref}.nc
+  #     min_lon=${domain.minlon} min_lat=${domain.minlat}
+  #     max_lon=${domain.maxlon} max_lat=${domain.maxlat}
+  #   deps:
+  #   - ${paths.prepared_ref_dir}/${ref}
+  #   outs:
+  #   - ${paths.prepared_ref_dir}/${ref}.nc:
+  #       cache: false
+
+  # download/obs:
+  #   foreach: ${obs}
+  #   do:
+  #     cmd: >
+  #       dz_download_ssh_tracks sat=${item}
+  #       download_dir=${paths.prepared_input_dir}/${item}
+  #       min_time=${period.start} max_time=${period.end}
+  #     outs:
+  #     - ${paths.prepared_input_dir}/${item}:
+  #         cache: false
+
+  # processing/obs:
+  #   foreach: ${obs}
+  #   do:
+  #     cmd: >
+  #       qf_filter_merge_daily_ssh_tracks
+  #       input_dir=${paths.prepared_input_dir}/${item}
+  #       output_path=${paths.prepared_processed_dir}/${item}.nc
+  #       min_lon=${domain.minlon} min_lat=${domain.minlat}
+  #       max_lon=${domain.maxlon} max_lat=${domain.maxlat}
+  #       min_time=${period.start} max_time=${period.end}
+  #     deps:
+  #     - ${paths.prepared_input_dir}/${item}
+  #     outs:
+  #     - ${paths.prepared_processed_dir}/${item}.nc:
+  #         cache: false
+
+  # concatenate:
+  #   cmd: >
+  #     qf_recipe-concat
+  #     params.input_dir=${paths.prepared_processed_dir}
+  #     params.output_path=${paths.prepared_gridded_dir}/conc_${domain.name}.nc
+  #   deps:
+  #   - ${paths.prepared_processed_dir}
+  #   outs:
+  #   - ${paths.prepared_gridded_dir}/conc_${domain.name}.nc:
+  #       cache: false
+
+  # grid:
+  #   cmd: >
+  #     python scripts/grid.py
+  #     +input_path=${paths.prepared_gridded_dir}/conc_${domain.name}.nc
+  #     +output_path=${paths.prepared_gridded_dir}/grid_${domain.name}_${res}.nc
+  #     +resolution=${res}
+  #     +min_lon=${domain.minlon} +max_lon=${domain.maxlon}
+  #     +min_lat=${domain.minlat} +max_lat=${domain.maxlat}
+  #     +min_time=${period.start} +max_time=${period.end}
+  #   params:
+  #   - res
+  #   deps:
+  #   - ${paths.prepared_gridded_dir}/conc_${domain.name}.nc
+  #   outs:
+  #   - ${paths.prepared_gridded_dir}/grid_${domain.name}_${res}.nc:
+  #       cache: false
+
+  predict:
+    cmd: >
+      qf_predict_4dvarnet_starter
+      input_path=${paths.prepared_gridded_dir}/grid_${domain.name}_${res}.nc
+      output_dir=${paths.inference_batches}/${method}
+      params.input_path=${paths.prepared_gridded_dir}/continuous_grid_${domain.name}_${res}.nc
+      params.config_path=${cfg_path}
+      params.ckpt_path=${ckpt_path}
+    params:
+    - cfg_path
+    - ckpt_path
+    - method
+    - res
+    # deps:
+    # - ${paths.prepared_gridded_dir}/grid_${domain.name}_${res}.nc
+    outs:
+    - ${paths.inference_batches}/${method}:
+        cache: false
+
+  # merge:
+  #   cmd: >
+  #     python scripts/merge.py
+  #     +input_directory=${paths.inference_batches}/${method}
+  #     +output_path=${paths.method_outputs}/${method}.nc
+  #     +resolution=${res}
+  #     +min_lon=${domain.minlon} +max_lon=${domain.maxlon}
+  #     +min_lat=${domain.minlat} +max_lat=${domain.maxlat}
+  #     +min_time=${period.start} +max_time=${period.end}
+  #     hydra.run.dir=.
+  #     hydra.output_subdir=null
+  #     hydra/job_logging=disabled
+  #     hydra/hydra_logging=disabled
+  #   params:
+  #   - method
+  #   - res
+  #   # deps:
+  #   # - ${paths.inference_batches}/${method}
+  #   outs:
+  #   - ${paths.method_outputs}/${method}.nc:
+  #       cache: false
+
+  # interpolate:
+  #   cmd: >
+  #     qf_interp_grid_on_track
+  #     grid_path=${paths.method_outputs}/${method}.nc
+  #     grid_var=ssh
+  #     track_path=${paths.prepared_ref_dir}/${ref}.nc
+  #     output_path=${paths.method_outputs}/${method}_on_c2_track.nc
+  #   params:
+  #   - method
+  #   deps:
+  #   - ${paths.method_outputs}/${method}.nc
+  #   - ${paths.prepared_ref_dir}/${ref}.nc
+  #   outs:
+  #   - ${paths.method_outputs}/${method}_on_c2_track.nc:
+  #       cache: false
+
+  # metrics/mu:
+  #   cmd: >
+  #     dz_alongtrack_mu
+  #     ref_path=${paths.prepared_ref_dir}/${ref}.nc
+  #     study_path=${paths.method_outputs}/${method}_on_c2_track.nc
+  #     study_var=ssh
+  #     output_path=${paths.metrics_dir}/mu_${method}.json
+  #   params:
+  #   - method
+  #   deps:
+  #   - ${paths.prepared_ref_dir}/${ref}.nc
+  #   - ${paths.method_outputs}/${method}_on_c2_track.nc
+  #   metrics:
+  #   - data/metrics/mu_${method}.json:
+  #       cache: false
+
+  # metrics/lx:
+  #   cmd: >
+  #     alongtrack_lambdax
+  #     ref_path=${paths.prepared_ref_dir}/${ref}.nc
+  #     study_path=${paths.method_outputs}/${method}_on_c2_track.nc
+  #     study_var=ssh
+  #     output_lambdax_path=${paths.metrics_dir}/lambdax_${method}.json
+  #     output_psd_path=${paths.method_outputs}/${method}_psd.nc
+  #   params:
+  #   - method
+  #   deps:
+  #   - ${paths.prepared_ref_dir}/${ref}.nc
+  #   - ${paths.method_outputs}/${method}_on_c2_track.nc
+  #   outs:
+  #   - ${paths.method_outputs}/${method}_psd.nc:
+  #       cache: false
+  #   metrics:
+  #   - data/metrics/lambdax_${method}.json:
+  #       cache: false
+
+  # leaderboard:
+  #   cmd: dvc metrics show --json | python scripts/metrics.py

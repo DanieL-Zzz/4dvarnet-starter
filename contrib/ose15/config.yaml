@@ -1,0 +1,53 @@
+obs:
+- c2
+- h2ag
+- h2b
+- j3
+- s3a
+- s3b
+ref: c2
+
+# GF15
+# domain:
+#   name: gf15
+#   minlon: -65.
+#   maxlon: -48.
+#   minlat: 28.
+#   maxlat: 45.
+
+# GRE15
+# domain:
+#   name: gre15
+#   minlon: -40.
+#   maxlon: -23.
+#   minlat: 48.
+#   maxlat: 65.
+
+# MAD15
+# domain:
+#   name: mad15
+#   minlon: -28.
+#   maxlon: -11.
+#   minlat: 28.
+#   maxlat: 45.
+
+domain:
+  name: global
+  minlon: -186.
+  maxlon: 186.
+  minlat: -79.
+  maxlat: 79.
+
+period:
+  start: '2018-12-01'
+  end: '2020-02-01'
+
+paths:
+  prepared_dir: data/prepared
+  prepared_input_dir: /DATASET/ssh-global-ose-2019/data/alongtrack
+  prepared_processed_dir: /DATASET/ssh-global-ose-2019/processed
+  prepared_gridded_dir: /DATASET/ssh-global-ose-2019/L4
+  prepared_ref_dir: data/prepared/ref
+  inference_batches: data/inference/batches
+  method_outputs: data/inference/method_outputs
+  metrics_dir: data/metrics

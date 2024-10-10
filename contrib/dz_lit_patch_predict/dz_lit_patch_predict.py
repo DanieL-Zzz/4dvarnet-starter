@@ -8,9 +8,12 @@ import hydra
 import hydra_zen
 import numpy as np
 import omegaconf
+import pandas as pd
 import pytorch_lightning as pl
 import toolz
 import torch
+import tqdm
+import qf_merge_patches
 import xarray as xr
 import xrpatcher
 from hydra.conf import HelpConf, HydraConf
@@ -114,6 +117,7 @@ class LitModel(pl.LightningModule):
         norm_stats,
         save_dir="batch_preds",
         out_dims=("time", "lat", "lon"),
+        **kwargs,
     ):
         super().__init__()
         self.patcher = patcher
@@ -123,8 +127,12 @@ class LitModel(pl.LightningModule):
         self.save_dir.mkdir(parents=True, exist_ok=True)
         self.out_dims = out_dims
         self.bs = 0
+        self.kwargs = kwargs
 
     def predict_step(self, batch, batch_idx: int, dataloader_idx: int = 0):
+        if batch_idx == 0:
+            self.predict_data = []
+
         outputs = self.solver(batch)
 
         self.bs = self.bs or outputs.shape[0]
@@ -140,7 +148,60 @@ class LitModel(pl.LightningModule):
             out = outputs[i]
             c = self.patcher[idx].coords.to_dataset()[list(self.out_dims)]
             da = xr.DataArray(out, dims=self.out_dims, coords=c.coords)
-            da.astype(np.float32).to_netcdf(self.save_dir / f"{idx}.nc")
+            # da.astype(np.float32).to_netcdf(self.save_dir / f"{idx}.nc")
+            self.predict_data.append(da.astype(np.float32))
+
+    def on_predict_end(self):
+        """
+        Merge the patches
+        """
+        output_path = self.save_dir / 'output.nc'
+
+        # Retrieve patch dimensions
+        p = self.predict_data[0]
+        time, lat, lon = p.time.shape[0], p.lat.shape[0], p.lon.shape[0]
+        def _crop(x):
+            return qf_merge_patches.crop(x, crop=8)
+        weight = self.kwargs.get(
+            'weight',
+            qf_merge_patches.build_weight(
+                patch_dims=dict(time=time, lat=lat, lon=lon),
+                dim_weights=dict(
+                    time=qf_merge_patches.triang, lat=_crop, lon=_crop,
+                )
+            ),
+        )
+        out_var = self.kwargs.get('out_var', 'ssh')
+        _cround = self.kwargs.get('_cround', dict(lat=3, lon=3))
+        out_coords = self.kwargs['out_coords']
+
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+
+        ## TODO: actual stuff
+        for c, nd in _cround.items():
+            out_coords[c] = np.round(out_coords[c], nd)
+        out_coords = xr.Dataset(coords=out_coords)
+        dims_shape = dict(**out_coords.sizes)
+
+        rec_da = xr.DataArray(
+            np.zeros(list(dims_shape.values())),
+            dims=list(dims_shape.keys()),
+            coords=out_coords.coords,
+        )
+
+        count_da = xr.zeros_like(rec_da)
+        n_batches = len(self.predict_data)
+        for i in tqdm.tqdm(range(n_batches)):
+            da = self.predict_data.pop(0)
+            da = da.assign_coords(**{c: np.round(da[c].values, nd) for c, nd in _cround.items()})
+            w = xr.zeros_like(da) + weight
+            wda = da * w
+            coords_labels = set(dims_shape.keys()).intersection(da.coords.dims)
+            da_co = {c: da[c].values for c in coords_labels}
+            rec_da.loc[da_co] = rec_da.sel(da_co) + wda
+            count_da.loc[da_co] = count_da.sel(da_co) + w
+
+        (rec_da / count_da).to_dataset(name=out_var).to_netcdf(output_path)
 
 
 ## PROCESS: Parameterize and implement how to go from input_files to output_files
@@ -148,7 +209,7 @@ def run(
     input_path: str = "???",
     output_dir: str = "???",
     norm_stats: list = None,
-    dl_kws: dict = dict(batch_size=4, num_workers=1),
+    dl_kws: dict = dict(batch_size=64, num_workers=1),
     trainer_fn="???",
     patcher_fn="???",
     solver_fn="???",
@@ -181,9 +242,22 @@ def run(
         ),
     )
 
+    date_min = patcher.da['time'][0].dt.date.item()
+    date_max = patcher.da['time'][-1].dt.date.item()
+    min_lat, max_lat = patcher.da.lat[0].item(), patcher.da.lat[-1].item()
+    min_lon, max_lon = patcher.da.lon[0].item(), patcher.da.lon[-1].item()
+    resolution = (patcher.da.lat[1] - patcher.da.lat[0]).item()
+
     dl = torch.utils.data.DataLoader(torch_ds, **dl_kws)
     log.info(f"{next(iter(dl)).input.shape=}")
-    litmod = LitModel(patcher, solver, norm_stats, save_dir=output_dir)
+    litmod = LitModel(
+        patcher, solver, norm_stats, save_dir=output_dir,
+        out_coords=dict(
+            time=pd.date_range(date_min, date_max, freq='1D'),
+            lat=np.arange(min_lat, max_lat+resolution, resolution),
+            lon=np.arange(min_lon, max_lon+resolution, resolution),
+        ),
+    )
     trainer.predict(litmod, dataloaders=dl)
 
     if not _skip_val:
