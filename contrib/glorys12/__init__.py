@@ -1,8 +1,8 @@
 """
 Learning GLORYS12 data
 """
-import time
 import functools as ft
+import time
 
 import numpy as np
 import torch
@@ -41,11 +41,16 @@ class DistinctNormDataModule(BaseDataModule):
     def setup(self, stage='test'):
         self.train_ds = LazyXrDataset(
             self.input_da.sel(self.domains['train']),
-            **self.xrds_kw, postpro_fn=self.post_fn('train'),
+            **self.xrds_kw['train'], postpro_fn=self.post_fn('train'),
         )
         self.val_ds = LazyXrDataset(
             self.input_da.sel(self.domains['val']),
-            **self.xrds_kw, postpro_fn=self.post_fn('val'),
+            **self.xrds_kw['val'], postpro_fn=self.post_fn('val'),
+        )
+
+    def val_dataloader(self):
+        return torch.utils.data.DataLoader(
+            self.val_ds, shuffle=False, batch_size=1, num_workers=1,
         )
 
 
@@ -59,9 +64,15 @@ class LazyXrDataset(torch.utils.data.Dataset):
         self.ds = ds.sel(**(domain_limits or {}))
         self.patch_dims = patch_dims
         self.strides = strides or {}
-        ds_dims = dict(zip(ds.dims, ds.input.shape))
+        _dims = ('variable',) + tuple(k for k in ds.dims)
+        _shape = (2,) + tuple(ds[k].shape[0] for k in ds.dims)
+        ds_dims = dict(zip(_dims, _shape))
+        # ds_dims = dict(zip(ds.dims, ds.shape))
         self.ds_size = {
-            dim: max((ds_dims[dim] - patch_dims[dim]) // 1 + 1, 0)
+            dim: max(
+                (ds_dims[dim] - patch_dims[dim]) // strides.get(dim, 1) + 1,
+                0,
+            )
             for dim in patch_dims
         }
 
@@ -100,11 +111,11 @@ class LazyXrDataset(torch.utils.data.Dataset):
                 self.strides.get(dim, 1) * idx + self.patch_dims[dim],
             )
 
-        item =  (
+        item = (
             self.ds
             .isel(**sl)
-            .to_array()
-            .sortby('variable')
+            # .to_array()
+            # .sortby('variable')
         )
 
         if self.return_coords:
@@ -120,11 +131,32 @@ class LazyXrDataset(torch.utils.data.Dataset):
 # -----
 
 class Lit4dVarNetIgnoreNaN(Lit4dVarNet):
-    def step(self, batch, phase=""):
+    def __init__(self, *args, **kwargs):
+        _val_rec_weight = kwargs.pop(
+            'val_rec_weight', kwargs['rec_weight'],
+        )
+        super().__init__(*args, **kwargs)
+
+        self.register_buffer(
+            'val_rec_weight',
+            torch.from_numpy(_val_rec_weight),
+            persistent=False,
+        )
+
+    def get_rec_weight(self, phase):
+        rec_weight = self.rec_weight
+        if phase == 'val':
+            rec_weight = self.val_rec_weight
+        return rec_weight
+
+    def step(self, batch, phase):
+        if self.training and batch.tgt.isfinite().float().mean() < 0.1:
+            return None, None
+
         loss, out = self.base_step(batch, phase)
         grad_loss = self.weighted_mse(
             kfilts.sobel(out) - kfilts.sobel(batch.tgt),
-            self.rec_weight,
+            self.get_rec_weight(phase),
         )
 
         prior_cost = self.solver.prior_cost(self.solver.init_state(batch, out))
@@ -136,9 +168,9 @@ class Lit4dVarNetIgnoreNaN(Lit4dVarNet):
         training_loss = 50 * loss + 1000 * grad_loss + 1.0 * prior_cost
         return training_loss, out
 
-    def base_step(self, batch, phase=''):
+    def base_step(self, batch, phase):
         out = self(batch=batch)
-        loss = self.weighted_mse(out - batch.tgt, self.rec_weight, [out, batch.tgt])
+        loss = self.weighted_mse(out - batch.tgt, self.get_rec_weight(phase))
 
         with torch.no_grad():
             self.log(
@@ -157,25 +189,28 @@ class Lit4dVarNetIgnoreNaN(Lit4dVarNet):
 # -----
 
 def load_glorys12_data(tgt_path, inp_path, tgt_var='zos', inp_var='input'):
-    # _isel = dict(time=slice(None, 130))
-    _isel = None
+    isel = None  # dict(time=slice(0, 365))
+
+    _start = time.time()
 
     tgt = (
         xr.open_dataset(tgt_path)[tgt_var]
         .drop_vars('depth')
         .drop_sel(time=('2012-02-29', '2016-02-29'))
-        .isel(_isel)
+        .isel(isel)
     )
-    inp = xr.open_dataset(inp_path)[inp_var].isel(_isel)
+    inp = xr.open_dataset(inp_path)[inp_var].isel(isel)
 
-    return (
+    ds = (
         xr.Dataset(
             dict(input=inp, tgt=(tgt.dims, tgt.values)), inp.coords,
         )
-        # .to_array()
-        # .sortby('variable')
+        .to_array()
+        .sortby('variable')
     )
 
+    print(f'>>> Durée de chargement : {time.time() - _start:.4f} s')
+    return ds
 
 def train(trainer, dm, lit_mod, ckpt=None):
     if trainer.logger is not None:
