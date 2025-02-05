@@ -24,8 +24,8 @@ trainer:
     name: ${hydra:runtime.choices.xp}
     version: ''
   max_epochs: 1000
-  limit_train_batches: 640
-  accumulate_grad_batches: 8
+  limit_train_batches: 100  # 640
+  # accumulate_grad_batches: 8
   callbacks:
     - _target_: pytorch_lightning.callbacks.LearningRateMonitor
     - _target_: pytorch_lightning.callbacks.ModelCheckpoint
@@ -72,7 +72,7 @@ model:
   opt_fn:
     _target_: src.utils.cosanneal_lr_adam
     _partial_: true
-    lr: 6.26e-4 # 1e-3
+    lr: 1e-4
     T_max: ${trainer.max_epochs}
   rec_weight:
     _target_: src.utils.get_triang_time_wei
