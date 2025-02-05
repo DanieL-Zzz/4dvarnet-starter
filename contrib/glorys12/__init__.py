@@ -175,7 +175,7 @@ class Lit4dVarNetIgnoreNaN(Lit4dVarNet):
 
         prior_cost = self.solver.prior_cost(self.solver.init_state(batch, out))
         self.log(
-            f'{phase}_gloss', grad_loss, prog_bar=True, on_step=False,
+            f'{phase}_gloss', grad_loss, prog_bar=False, on_step=False,
             on_epoch=True,  # sync_dist=True,
         )
 
@@ -192,7 +192,7 @@ class Lit4dVarNetIgnoreNaN(Lit4dVarNet):
                 prog_bar=True, on_step=False, on_epoch=True,  # sync_dist=True,
             )
             self.log(
-                f'{phase}_loss', loss, prog_bar=True, on_step=False,
+                f'{phase}_loss', loss, prog_bar=False, on_step=False,
                 on_epoch=True,  # sync_dist=True,
             )
 
@@ -215,7 +215,7 @@ class Lit4dVarNetIgnoreNaN(Lit4dVarNet):
 # -----
 
 def load_glorys12_data(tgt_path, inp_path, tgt_var='zos', inp_var='input'):
-    isel = None  # dict(time=slice(0, 365))
+    isel = None  # dict(time=slice(-465, -265))
 
     _start = time.time()
 
