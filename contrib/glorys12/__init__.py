@@ -199,9 +199,9 @@ class Lit4dVarNetIgnoreNaN(Lit4dVarNet):
             if phase == 'val':
                 # Log the loss in Gulfstream
                 loss_gf = self.weighted_mse(
-                    out[:, 445:485, 420:460].detach().cpu().data
-                    - batch.tgt[:, 445:485, 420:460].detach().cpu().data,
-                    np.ones_like(out[:, 445:485, 420:460].detach().cpu().data)
+                    out[:, :, 445:485, 420:460].detach().cpu().data
+                    - batch.tgt[:, :, 445:485, 420:460].detach().cpu().data,
+                    np.ones_like(out[:, :, 445:485, 420:460].detach().cpu().data)
                 )
                 self.log(
                     f'{phase}_loss_gulfstream', loss_gf, on_step=False,
