@@ -143,14 +143,28 @@ class Lit4dVarNetIgnoreNaN(Lit4dVarNet):
             persistent=False,
         )
 
+        self._n_rejected_batches = 0
+
     def get_rec_weight(self, phase):
         rec_weight = self.rec_weight
         if phase == 'val':
             rec_weight = self.val_rec_weight
         return rec_weight
 
+    def training_step(self, batch, batch_idx):
+        loss = super().training_step(batch, batch_idx)
+        if loss is None:
+            self._n_rejected_batches += 1
+        return loss
+
+    def on_train_epoch_end(self):
+        self.log(
+            'n_rejected_batches', self._n_rejected_batches, on_step=False,
+            on_epoch=True,
+        )
+
     def step(self, batch, phase):
-        if self.training and batch.tgt.isfinite().float().mean() < 0.1:
+        if self.training and batch.tgt.isfinite().float().mean() < 0.5:
             return None, None
 
         loss, out = self.base_step(batch, phase)
@@ -181,6 +195,18 @@ class Lit4dVarNetIgnoreNaN(Lit4dVarNet):
                 f'{phase}_loss', loss, prog_bar=True, on_step=False,
                 on_epoch=True,  # sync_dist=True,
             )
+
+            if phase == 'val':
+                # Log the loss in Gulfstream
+                loss_gf = self.weighted_mse(
+                    out[:, 445:485, 420:460].detach().cpu().data
+                    - batch.tgt[:, 445:485, 420:460].detach().cpu().data,
+                    np.ones_like(out[:, 445:485, 420:460].detach().cpu().data)
+                )
+                self.log(
+                    f'{phase}_loss_gulfstream', loss_gf, on_step=False,
+                    on_epoch=True,
+                )
 
         return loss, out
 
