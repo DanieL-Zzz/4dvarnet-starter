@@ -1,6 +1,7 @@
 """
 Learning GLORYS12 data
 """
+import collections
 import functools as ft
 import time
 
@@ -10,7 +11,11 @@ import kornia.filters as kfilts
 import xarray as xr
 
 from src.data import BaseDataModule, TrainingItem
-from src.models import Lit4dVarNet
+from src.models import Lit4dVarNet, GradSolver
+
+TrainingItemWithMDT = collections.namedtuple(
+    'TrainingItemWithMDT', ['input', 'mdt', 'tgt'],
+)
 
 
 # Exceptions
@@ -24,6 +29,11 @@ class NormParamsNotProvided(Exception):
 # ----
 
 class DistinctNormDataModule(BaseDataModule):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.init_with_mdt = kwargs.get('init_with_mdt', False)
+
     def norm_stats(self):
         if self._norm_stats is None:
             raise NormParamsNotProvided()
@@ -32,6 +42,14 @@ class DistinctNormDataModule(BaseDataModule):
     def post_fn(self, phase):
         m, s = self.norm_stats()[phase]
         normalize = lambda item: (item - m) / s
+
+        if self.init_with_mdt:
+            return ft.partial(ft.reduce,lambda i, f: f(i), [
+                TrainingItemWithMDT._make,
+                lambda item: item._replace(tgt=normalize(item.tgt)),
+                lambda item: item._replace(input=normalize(item.input)),
+                lambda item: item._replace(mdt=normalize(item.mdt)),
+            ])
         return ft.partial(ft.reduce,lambda i, f: f(i), [
             TrainingItem._make,
             lambda item: item._replace(tgt=normalize(item.tgt)),
@@ -211,6 +229,23 @@ class Lit4dVarNetIgnoreNaN(Lit4dVarNet):
         return loss, out
 
 
+class GradSolverMDT(GradSolver):
+    def init_state(self, batch, x_init=None):
+        if x_init is not None:
+            return x_init
+
+        return (
+            torch.where(
+                ~batch.input.isnan(),
+                batch.input,
+                batch.mdt,
+            )
+            .nan_to_num()
+            .detach()
+            .requires_grad_(True)
+        )
+
+
 # Utils
 # -----
 
@@ -228,6 +263,32 @@ def load_glorys12_data(tgt_path, inp_path, tgt_var='zos', inp_var='input'):
     ds = (
         xr.Dataset(
             dict(input=inp, tgt=(tgt.dims, tgt.values)), inp.coords,
+        )
+        .to_array()
+        .sortby('variable')
+    )
+
+    print(f'>>> Durée de chargement : {time.time() - _start:.4f} s')
+    return ds
+
+def load_glorys12_data_and_mdt(
+    tgt_path, inp_path, mdt_path, tgt_var='zos', inp_var='input',
+    mdt_var='mean_adt'
+):
+    isel = None  # dict(time=slice(-465, -265))
+
+    _start = time.time()
+
+    tgt = (
+        xr.open_dataset(tgt_path)[tgt_var]
+        .isel(isel)
+    )
+    inp = xr.open_dataset(inp_path)[inp_var].isel(isel)
+    mdt = xr.open_dataset(mdt_path)[mdt_var]
+
+    ds = (
+        xr.Dataset(
+            dict(input=inp, tgt=(tgt.dims, tgt.values), mdt=mdt), inp.coords,
         )
         .to_array()
         .sortby('variable')
