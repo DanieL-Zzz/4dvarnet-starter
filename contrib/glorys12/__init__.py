@@ -221,8 +221,6 @@ def load_glorys12_data(tgt_path, inp_path, tgt_var='zos', inp_var='input'):
 
     tgt = (
         xr.open_dataset(tgt_path)[tgt_var]
-        .drop_vars('depth')
-        .drop_sel(time=('2012-02-29', '2016-02-29'))
         .isel(isel)
     )
     inp = xr.open_dataset(inp_path)[inp_var].isel(isel)
