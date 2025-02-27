@@ -64,10 +64,10 @@ class LazyXrDataset(torch.utils.data.Dataset):
         self.ds = ds.sel(**(domain_limits or {}))
         self.patch_dims = patch_dims
         self.strides = strides or {}
-        _dims = ('variable',) + tuple(k for k in ds.dims)
-        _shape = (2,) + tuple(ds[k].shape[0] for k in ds.dims)
+        _dims = ('variable',) + tuple(k for k in self.ds.dims)
+        _shape = (2,) + tuple(self.ds[k].shape[0] for k in self.ds.dims)
         ds_dims = dict(zip(_dims, _shape))
-        # ds_dims = dict(zip(ds.dims, ds.shape))
+        # ds_dims = dict(zip(self.ds.dims, self.ds.shape))
         self.ds_size = {
             dim: max(
                 (ds_dims[dim] - patch_dims[dim]) // strides.get(dim, 1) + 1,
