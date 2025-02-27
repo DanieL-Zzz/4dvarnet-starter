@@ -214,7 +214,24 @@ class Lit4dVarNetIgnoreNaN(Lit4dVarNet):
 # Utils
 # -----
 
-def load_glorys12_data(tgt_path, inp_path, tgt_var='zos', inp_var='input'):
+def fix_dim_after_pad(dim_values, extension, resolution):
+    return np.concat((
+        np.arange(
+            dim_values[0] - extension * resolution,
+            dim_values[0],
+            resolution,
+        ),
+        dim_values.values,
+        np.arange(
+            dim_values[-1] + resolution,
+            dim_values[-1] + resolution + extension * resolution,
+            resolution,
+        ),
+    ))
+
+def load_glorys12_data(
+    tgt_path, inp_path, tgt_var='zos', inp_var='input', extend=None,
+):
     isel = None  # dict(time=slice(-465, -265))
 
     _start = time.time()
@@ -225,13 +242,28 @@ def load_glorys12_data(tgt_path, inp_path, tgt_var='zos', inp_var='input'):
     )
     inp = xr.open_dataset(inp_path)[inp_var].isel(isel)
 
-    ds = (
-        xr.Dataset(
-            dict(input=inp, tgt=(tgt.dims, tgt.values)), inp.coords,
-        )
-        .to_array()
-        .sortby('variable')
+    ds = xr.Dataset(
+        dict(input=inp, tgt=(tgt.dims, tgt.values)), inp.coords,
     )
+
+    if extend is not None:
+        extend_lat, extend_lon = int(extend['lat']), int(extend['lon'])
+        res = np.round(ds.lon[1] - ds.lon[0], 2).item()
+        ds = (
+            ds
+            .pad(
+                pad_width=dict(lon=int(extend_lon)), mode='wrap',
+            )
+            .assign(lon=fix_dim_after_pad(ds.lon, extend_lon, res))
+            .pad(
+                pad_width=dict(lat=int(extend_lat)),
+                mode='constant',
+                constant_values=np.nan,
+            )
+            .assign(lat=fix_dim_after_pad(ds.lat, extend_lat, res))
+        )
+
+    ds = ds.to_array().sortby('variable')
 
     print(f'>>> Durée de chargement : {time.time() - _start:.4f} s')
     return ds
