@@ -76,6 +76,22 @@ def load_and_interpolate(tgt_path, inp_path, tgt_var, inp_var, domain):
         .to_array()
     )
 
+def load_dataset(tgt_path, inp_path, tgt_var, inp_var, domain):
+    ds = (
+        xr.open_dataset(tgt_path)
+        .rename(latitude='lat', longitude='lon')
+        .sel(domain)
+    )
+
+    return (
+        xr.Dataset(
+            dict(input=ds.inp, tgt=(ds.tgt.dims, ds.tgt.values)),
+            ds.inp.coords,
+        )
+        .transpose('time', 'lat', 'lon')
+        .to_array()
+    )
+
 def run(trainer, train_dm, test_dm, lit_mod, ckpt=None):
     """
     Fit and test on two distinct domains.
@@ -85,5 +101,5 @@ def run(trainer, train_dm, test_dm, lit_mod, ckpt=None):
         print('Logdir:', trainer.logger.log_dir)
         print()
 
-    trainer.fit(lit_mod, datamodule=train_dm, ckpt_path=ckpt)
-    trainer.test(lit_mod, datamodule=test_dm, ckpt_path='best')
+    # trainer.fit(lit_mod, datamodule=train_dm, ckpt_path=ckpt)
+    trainer.test(lit_mod, datamodule=test_dm, ckpt_path=ckpt)

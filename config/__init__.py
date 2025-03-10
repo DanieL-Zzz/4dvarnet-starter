@@ -39,6 +39,7 @@ domains = {
     "osmosis": dict(lon=[-22.5, -10.5], lat=[44, 56]),
     "gf": dict(lon=[-66, -54], lat=[32, 44]),
     "gf15": dict(lon=[-65, -48], lat=[28, 45]),
+    "biggf": dict(lon=[-73., -39.], lat=[15., 49.]),
     "fgf": dict(lon=[-66, -54], lat=[33, 45]),
     "2gf": dict(lon=[-71., -49.], lat=[32, 44]),
     "4gf": dict(lon=[-71., -29.], lat=[32, 44]),
