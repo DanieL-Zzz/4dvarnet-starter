@@ -135,6 +135,11 @@ class Lit4dVarNetIgnoreNaN(Lit4dVarNet):
         _val_rec_weight = kwargs.pop(
             'val_rec_weight', kwargs['rec_weight'],
         )
+        self.train_weights = (
+            kwargs.pop('train_weight', 50),
+            kwargs.pop('train_weight_grad', 1000),
+            kwargs.pop('train_weight_prior', 1.),
+        )
         super().__init__(*args, **kwargs)
 
         self.register_buffer(
@@ -179,7 +184,11 @@ class Lit4dVarNetIgnoreNaN(Lit4dVarNet):
             on_epoch=True,  # sync_dist=True,
         )
 
-        training_loss = 50 * loss + 1000 * grad_loss + 1.0 * prior_cost
+        training_loss = (
+            self.train_weights[0] * loss
+            + self.train_weights[1] * grad_loss
+            + self.train_weights[2] * prior_cost
+        )
         return training_loss, out
 
     def base_step(self, batch, phase):
