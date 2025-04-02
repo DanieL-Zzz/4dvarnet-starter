@@ -1,6 +1,7 @@
 """
 Learning GLORYS12 data
 """
+from collections import namedtuple
 import functools as ft
 import time
 
@@ -11,6 +12,8 @@ import xarray as xr
 
 from src.data import BaseDataModule, TrainingItem
 from src.models import Lit4dVarNet
+
+TrainingItemSSTD = namedtuple('TrainingItemSSTD', ['input', 'sstd', 'tgt'])
 
 
 # Exceptions
@@ -33,9 +36,10 @@ class DistinctNormDataModule(BaseDataModule):
         m, s = self.norm_stats()[phase]
         normalize = lambda item: (item - m) / s
         return ft.partial(ft.reduce,lambda i, f: f(i), [
-            TrainingItem._make,
-            lambda item: item._replace(tgt=normalize(item.tgt)),
-            lambda item: item._replace(input=normalize(item.input)),
+            TrainingItemSSTD._make,
+            lambda item: item._replace(tgt=item.tgt / (item.sstd + 1e-6)),
+            lambda item: item._replace(sstd=item.sstd + 1e-6),
+            lambda item: item._replace(input=item.input / (item.sstd + 1e-6)),
         ])
 
     def setup(self, stage='test'):
@@ -195,9 +199,21 @@ class Lit4dVarNetIgnoreNaN(Lit4dVarNet):
         out = self(batch=batch)
         loss = self.weighted_mse(out - batch.tgt, self.get_rec_weight(phase))
 
+        if loss > 900:
+            np.save('_tmp/out.npy', out.cpu().data)
+            np.save('_tmp/inp.npy', batch.input.cpu().data)
+            np.save('_tmp/tgt.npy', batch.tgt.cpu().data)
+            np.save('_tmp/sstd.npy', batch.sstd.cpu().data)
+            raise Exception('NON ÇA A ENCORE EXPLOSÉ !')
+
         with torch.no_grad():
+            denormalised_loss = self.weighted_mse(
+                (out - batch.tgt) * batch.sstd,
+                self.get_rec_weight(phase),
+            )
+
             self.log(
-                f'{phase}_mse', 10000 * loss * self.norm_stats[phase][1]**2,
+                f'{phase}_mse', 10000 * denormalised_loss,
                 prog_bar=True, on_step=False, on_epoch=True,  # sync_dist=True,
             )
             self.log(
@@ -232,11 +248,17 @@ def load_glorys12_data(tgt_path, inp_path, tgt_var='zos', inp_var='input'):
         xr.open_dataset(tgt_path)[tgt_var]
         .isel(isel)
     )
+    sstd = (
+        xr.open_dataset(
+            '/Odyssey/private/d22zhu/nc/glorys/glorys4_2010_2019_sla_sstd.nc'
+        )
+        .sla_std
+    )
     inp = xr.open_dataset(inp_path)[inp_var].isel(isel)
 
     ds = (
         xr.Dataset(
-            dict(input=inp, tgt=(tgt.dims, tgt.values)), inp.coords,
+            dict(input=inp, sstd=sstd, tgt=(tgt.dims, tgt.values)), inp.coords,
         )
         .to_array()
         .sortby('variable')
