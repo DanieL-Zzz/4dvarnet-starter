@@ -57,6 +57,7 @@ class DistinctNormDataModule(BaseDataModule):
 class LazyXrDataset(torch.utils.data.Dataset):
     def __init__(
         self, ds, patch_dims, domain_limits=None, strides=None, postpro_fn=None,
+        noise=None,
     ):
         super().__init__()
         self.return_coords = False
@@ -75,6 +76,8 @@ class LazyXrDataset(torch.utils.data.Dataset):
             )
             for dim in patch_dims
         }
+        self._rng = np.random.default_rng()
+        self.noise = noise
 
     def __len__(self):
         size = 1
@@ -122,6 +125,14 @@ class LazyXrDataset(torch.utils.data.Dataset):
             return item.coords.to_dataset()[list(self.patch_dims)]
 
         item = item.data.astype(np.float32)
+
+        if self.noise:
+            noise = np.tile(
+                self._rng.uniform(-self.noise, self.noise, item[0].shape),
+                (2, 1, 1, 1)
+            ).astype(np.float32)
+            item = item + noise
+
         if self.postpro_fn is not None:
             return self.postpro_fn(item)
         return item
@@ -224,7 +235,7 @@ class Lit4dVarNetIgnoreNaN(Lit4dVarNet):
 # -----
 
 def load_glorys12_data(tgt_path, inp_path, tgt_var='zos', inp_var='input'):
-    isel = None  # dict(time=slice(-465, -265))
+    isel = None  # dict(time=slice(-365 * 2, None))
 
     _start = time.time()
 

@@ -1,0 +1,12 @@
+# @package _global_
+
+datamodule:
+  xrds_kw:
+    train:
+      noise: .03
+    val:
+      noise: .03
+
+defaults:
+  - glo12
+  - _self_
