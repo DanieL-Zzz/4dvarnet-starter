@@ -1,0 +1,29 @@
+# @package _global_
+
+xpname: ttt
+
+trainer:
+  max_epochs: 350
+  limit_train_batches: 1000
+
+datamodule:
+  xrds_kw:
+    train:
+      patch_dims: {time: 15, lat: 48, lon: 48}
+      strides: {time: 1, lat: 40, lon: 40}
+      domain_limits: ${domain.train}
+  dl_kw: {batch_size: 64, num_workers: 2}
+
+model:
+  opt_fn:
+    lr: 3e-4
+  solver:
+    _target_: src.models.GradSolver
+    n_step: 10
+    prior_cost:
+      # dim_hidden: 128
+      downsamp: null
+
+defaults:
+  - glo12-sla
+  - _self_
