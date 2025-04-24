@@ -3,14 +3,17 @@ Learning GLORYS12 data
 """
 import functools as ft
 import time
+from collections import namedtuple
 
 import numpy as np
 import torch
 import kornia.filters as kfilts
 import xarray as xr
 
-from src.data import BaseDataModule, TrainingItem
-from src.models import Lit4dVarNet
+from src.data import BaseDataModule
+from src.models import ConvLstmGradModel, Lit4dVarNet
+
+TrainingItem = namedtuple('TrainingItem', ['input', 'tgt', 'std_'])
 
 
 # Exceptions
@@ -30,13 +33,7 @@ class DistinctNormDataModule(BaseDataModule):
         return self._norm_stats
 
     def post_fn(self, phase):
-        m, s = self.norm_stats()[phase]
-        normalize = lambda item: (item - m) / s
-        return ft.partial(ft.reduce,lambda i, f: f(i), [
-            TrainingItem._make,
-            lambda item: item._replace(tgt=normalize(item.tgt)),
-            lambda item: item._replace(input=normalize(item.input)),
-        ])
+        return None
 
     def setup(self, stage='test'):
         self.train_ds = LazyXrDataset(
@@ -57,6 +54,7 @@ class DistinctNormDataModule(BaseDataModule):
 class LazyXrDataset(torch.utils.data.Dataset):
     def __init__(
         self, ds, patch_dims, domain_limits=None, strides=None, postpro_fn=None,
+        norm_path=None,
     ):
         super().__init__()
         self.return_coords = False
@@ -75,6 +73,14 @@ class LazyXrDataset(torch.utils.data.Dataset):
             )
             for dim in patch_dims
         }
+
+        self._norm_dims = None
+        self._mean, self._std = 0., 1.
+        if norm_path:
+            norm = xr.open_dataset(norm_path)
+            self._norm_dims = tuple(norm.dims)
+            self._mean = norm.mean_
+            self._std = norm.std_ + 1e-6
 
     def __len__(self):
         size = 1
@@ -124,11 +130,57 @@ class LazyXrDataset(torch.utils.data.Dataset):
         item = item.data.astype(np.float32)
         if self.postpro_fn is not None:
             return self.postpro_fn(item)
+        else:
+            norm_sl = sl
+            if self._norm_dims:
+                norm_sl = {
+                    dim: sl[dim] for dim in sl if dim in self._norm_dims
+                }
+            mean_ = self._mean.isel(**norm_sl).data.astype(np.float32)[None,]
+            std_ = self._std.isel(**norm_sl).data.astype(np.float32)[None,]
+
+            item = TrainingItem(
+                input=(item[0] - mean_) / std_,
+                tgt=(item[1] - mean_) / std_,
+                std_=std_,
+            )
         return item
 
 
 # Model
 # -----
+
+class NormConvLstmGradModel(ConvLstmGradModel):
+    def __init__(self, *args, **kwargs):
+        self._patch_dim = kwargs.pop('patch_dim', 48)
+
+        super().__init__(*args, **kwargs)
+
+        self.avgpool = torch.nn.AvgPool2d(kernel_size=self._patch_dim)
+        self._c = 0
+
+    def forward(self, x):
+        if self._grad_norm is None:
+            _shape = x.shape[-2:]
+
+            mode = 'nearest'
+            if _shape[0] > self._patch_dim:
+                mode = 'bicubic'
+
+            self._grad_norm = (x**2).mean(dim=1, keepdim=True).sqrt() + 1e-6
+            self._grad_norm = self.avgpool(self._grad_norm)
+            self._grad_norm = torch.nn.functional.interpolate(
+                self._grad_norm, size=_shape, mode=mode,
+            )
+
+            self._c += 1
+
+            if x.shape[0] > 1 and self._c % 10000 == 0:
+                np.save(f'_LOCAL_/tmp/{self._c}_x.npy', x.detach().cpu().numpy(), allow_pickle=True)
+                np.save(f'_LOCAL_/tmp/{self._c}_g.npy', self._grad_norm.detach().cpu().numpy(), allow_pickle=True)
+
+        return super().forward(x)
+
 
 class Lit4dVarNetIgnoreNaN(Lit4dVarNet):
     def __init__(self, *args, **kwargs):
@@ -196,8 +248,12 @@ class Lit4dVarNetIgnoreNaN(Lit4dVarNet):
         loss = self.weighted_mse(out - batch.tgt, self.get_rec_weight(phase))
 
         with torch.no_grad():
+            denormalised_loss = self.weighted_mse(
+                (out - batch.tgt) * batch.std_, self.get_rec_weight(phase),
+            )
+
             self.log(
-                f'{phase}_mse', 10000 * loss * self.norm_stats[phase][1]**2,
+                f'{phase}_mse', 10000 * denormalised_loss,
                 prog_bar=True, on_step=False, on_epoch=True,  # sync_dist=True,
             )
             self.log(

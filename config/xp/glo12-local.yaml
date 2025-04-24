@@ -1,0 +1,21 @@
+# @package _global_
+
+xpname: ttt
+
+datamodule:
+  xrds_kw:
+    train:
+      norm_path: /Odyssey/private/d22zhu/nc/glorys/local-normalisation/stat_2010_2018_smoothed.nc
+    val:
+      norm_path: /Odyssey/private/d22zhu/nc/glorys/local-normalisation/stat_2019_smoothed.nc
+
+model:
+  solver:
+    grad_mod:
+      _target_: contrib.glorys12.NormConvLstmGradModel
+      patch_dim: ${datamodule.xrds_kw.train.patch_dims.lat}
+  norm_stats: ${datamodule.norm_stats}
+
+defaults:
+  - glo12
+  - _self_
