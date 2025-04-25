@@ -44,7 +44,7 @@ class Lit4dVarNet(pl.LightningModule):
 
     def forward(self, batch):
         return self.solver(batch)
-    
+
     def step(self, batch, phase=""):
         if self.training and batch.tgt.isfinite().float().mean() < 0.9:
             return None, None
@@ -52,7 +52,7 @@ class Lit4dVarNet(pl.LightningModule):
         loss, out = self.base_step(batch, phase)
         grad_loss = self.weighted_mse( kfilts.sobel(out) - kfilts.sobel(batch.tgt), self.rec_weight)
         prior_cost = self.solver.prior_cost(self.solver.init_state(batch, out))
-        self.log( f"{phase}_gloss", grad_loss, prog_bar=True, on_step=False, on_epoch=True)
+        self.log( f"{phase}_gloss", grad_loss, prog_bar=False, on_step=False, on_epoch=True)
 
         training_loss = 50 * loss + 1000 * grad_loss + 1.0 * prior_cost
         return training_loss, out
@@ -63,7 +63,7 @@ class Lit4dVarNet(pl.LightningModule):
 
         with torch.no_grad():
             self.log(f"{phase}_mse", 10000 * loss * self.norm_stats[1]**2, prog_bar=True, on_step=False, on_epoch=True)
-            self.log(f"{phase}_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+            self.log(f"{phase}_loss", loss, prog_bar=False, on_step=False, on_epoch=True)
 
         return loss, out
 
@@ -103,7 +103,7 @@ class Lit4dVarNet(pl.LightningModule):
 
         metric_data = self.test_data.pipe(self.pre_metric_fn)
         metrics = pd.Series({
-            metric_n: metric_fn(metric_data) 
+            metric_n: metric_fn(metric_data)
             for metric_n, metric_fn in self.metrics.items()
         })
 
@@ -141,7 +141,7 @@ class GradSolver(nn.Module):
             1 / (step + 1) * gmod
                 + self.lr_grad * (step + 1) / self.n_step * grad
         )
-        
+
 
         return state - state_update
 

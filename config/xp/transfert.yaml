@@ -6,11 +6,11 @@ resolution: '1_4'  # '1_20' or '1_8' (apostrophes « ' » are necessary!)
 
 paths:
   tgt:
-    train: /Odyssey/public/enatl60/ssh/eNATL60-BLB002-2009-2010-${resolution}.nc
-    test: /Odyssey/public/natl60/ssh/NATL60-CJM165-2012-2013-${resolution}.nc
+    train: /Odyssey/public/enatl60/ssh/eNATL60-BLB002-ssh-7nadirs-2009-2010-${resolution}.nc
+    test: /Odyssey/public/natl60/ssh/NATL60-CJM165-ssh-7nadirs-2012-2013-${resolution}.nc
   inp:
-    train: /Odyssey/public/enatl60/ssh/eNATL60-BLB002-2009-2010-${resolution}.nc
-    test: /Odyssey/public/natl60/ssh/NATL60-CJM165-2012-2013-${resolution}.nc
+    train: /Odyssey/public/enatl60/ssh/eNATL60-BLB002-ssh-7nadirs-2009-2010-${resolution}.nc
+    test: /Odyssey/public/natl60/ssh/NATL60-CJM165-ssh-7nadirs-2012-2013-${resolution}.nc
 
 trainer:
   _target_: pytorch_lightning.Trainer
@@ -40,25 +40,23 @@ datamodule:
       crop: {time: 0, lat: 20, lon: 20}
       offset: 1
   '1_4':
-    patch_dims: {time: 15, lat: 136, lon: 136}
-    patch_strides: {time: 1, lat: 120, lon: 120}
-    # patch_dims: {time: 15, lat: 68, lon: 68}
-    # patch_strides: {time: 1, lat: 60, lon: 60}
+    patch_dims: {time: 15, lat: 68, lon: 68}
+    patch_strides: {time: 1, lat: 60, lon: 60}
     rec_weight:
-      crop: {time: 0, lat: 7, lon: 7}
+      crop: {time: 0, lat: 3, lon: 3}
       # crop: {time: 0, lat: 2, lon: 2}
       offset: 1
   aug_kw: {aug_factor: 2, aug_only: true}
-  dl_kw: {batch_size: 64, num_workers: 1}
+  dl_kw: {batch_size: 4, num_workers: 1}
 
 train_dm:
   _target_: contrib.transfert.TransfertDataModule
   input_da:
     _target_: contrib.transfert.load_dataset
     tgt_path: ${paths.tgt.train}
-    tgt_var: ssh
+    tgt_var: tgt
     inp_path: ${paths.inp.train}
-    inp_var: input
+    inp_var: inp
     domain: ${domain.train}
   domains:
     train:
@@ -78,9 +76,9 @@ test_dm:
   input_da:
     _target_: contrib.transfert.load_dataset
     tgt_path: ${paths.tgt.test}
-    tgt_var: ssh
+    tgt_var: tgt
     inp_path: ${paths.inp.test}
-    inp_var: input
+    inp_var: inp
     domain: ${domain.train}
   domains:
     train: null
@@ -167,5 +165,5 @@ entrypoints:
     ckpt: ${ckpt}
 
 defaults:
-  - /domain: dNATL
+  - /domain: gf15
   - _self_
