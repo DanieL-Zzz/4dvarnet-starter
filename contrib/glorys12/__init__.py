@@ -24,6 +24,13 @@ class NormParamsNotProvided(Exception):
 # ----
 
 class DistinctNormDataModule(BaseDataModule):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.input_mask = None
+        if isinstance(self.input_da, (tuple, list)):
+            self.input_da, self.input_mask = self.input_da[0], self.input_da[1]
+
     def norm_stats(self):
         if self._norm_stats is None:
             raise NormParamsNotProvided()
@@ -42,10 +49,12 @@ class DistinctNormDataModule(BaseDataModule):
         self.train_ds = LazyXrDataset(
             self.input_da.sel(self.domains['train']),
             **self.xrds_kw['train'], postpro_fn=self.post_fn('train'),
+            mask=self.input_mask,
         )
         self.val_ds = LazyXrDataset(
             self.input_da.sel(self.domains['val']),
             **self.xrds_kw['val'], postpro_fn=self.post_fn('val'),
+            mask=self.input_mask,
         )
 
     def val_dataloader(self):
@@ -57,7 +66,7 @@ class DistinctNormDataModule(BaseDataModule):
 class LazyXrDataset(torch.utils.data.Dataset):
     def __init__(
         self, ds, patch_dims, domain_limits=None, strides=None, postpro_fn=None,
-        noise=None,
+        noise=None, *args, **kwargs,
     ):
         super().__init__()
         self.return_coords = False
@@ -78,6 +87,7 @@ class LazyXrDataset(torch.utils.data.Dataset):
         }
         self._rng = np.random.default_rng()
         self.noise = noise
+        self.mask = kwargs.get('mask')
 
     def __len__(self):
         size = 1
@@ -114,12 +124,30 @@ class LazyXrDataset(torch.utils.data.Dataset):
                 self.strides.get(dim, 1) * idx + self.patch_dims[dim],
             )
 
-        item = (
-            self.ds
-            .isel(**sl)
-            # .to_array()
-            # .sortby('variable')
-        )
+        if self.mask is not None:
+            start, stop = sl['time'].start % 365, sl['time'].stop % 365
+            if start > stop:
+                start -= stop
+                stop = None
+            sl_mask = sl.copy()
+            sl_mask['time'] = slice(start, stop)
+
+            da = self.ds.isel(**sl)
+
+            item = (
+                da
+                .to_dataset(name='tgt')
+                .assign(input=da.where(self.mask.isel(**sl_mask).values))
+                .to_array()
+                .sortby('variable')
+            )
+        else:
+            item = (
+                self.ds
+                .isel(**sl)
+                # .to_array()
+                # .sortby('variable')
+            )
 
         if self.return_coords:
             return item.coords.to_dataset()[list(self.patch_dims)]
@@ -223,7 +251,7 @@ class Lit4dVarNetIgnoreNaN(Lit4dVarNet):
 # -----
 
 def load_glorys12_data(tgt_path, inp_path, tgt_var='zos', inp_var='input'):
-    isel = None  # dict(time=slice(-365 * 2, None))
+    isel = None  # dict(time=slice(-365 * 2, None))
 
     _start = time.time()
 
@@ -243,6 +271,24 @@ def load_glorys12_data(tgt_path, inp_path, tgt_var='zos', inp_var='input'):
 
     print(f'>>> Durée de chargement : {time.time() - _start:.4f} s')
     return ds
+
+def load_glorys12_data_on_fly_inp(
+    tgt_path, inp_path, tgt_var='zos', inp_var='input',
+):
+    isel = None  # dict(time=slice(-365 * 2, None))
+
+    tgt = (
+        xr.open_dataset(tgt_path)[tgt_var]
+        .isel(isel)
+        .rename(latitude='lat', longitude='lon')
+    )
+    inp = (
+        xr.open_dataset(inp_path)[inp_var]
+        .isel(isel)
+        .rename(latitude='lat', longitude='lon')
+    )
+
+    return tgt, inp
 
 def train(trainer, dm, lit_mod, ckpt=None):
     if trainer.logger is not None:
