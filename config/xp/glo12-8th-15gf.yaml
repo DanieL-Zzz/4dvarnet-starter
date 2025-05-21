@@ -1,0 +1,17 @@
+# @package _global_
+
+trainer:
+  check_val_every_n_epoch: 1
+
+datamodule:
+  xrds_kw:
+    train:
+      patch_dims: {time: 15, lat: 136, lon: 136}
+      strides: {time: 1, lat: 120, lon: 120}
+    val:
+      patch_dims: {time: 15, lat: 136, lon: 136}
+      strides: {time: 1, lat: 120, lon: 120}
+
+defaults:
+  - glo12-8th
+  - _self_
