@@ -11,6 +11,13 @@ datamodule:
     val:
       patch_dims: {time: 15, lat: 68, lon: 68}
       strides: {time: 1, lat: 60, lon: 60}
+  norm_stats:  # norm values from tgt
+    train:
+    - -0.00513238120868121130
+    - 0.18577961151356719993
+    val:
+    - 0.04226355443095140829
+    - 0.19526579490324250110
 
 defaults:
   - glo12
