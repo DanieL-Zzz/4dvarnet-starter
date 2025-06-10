@@ -280,12 +280,12 @@ def load_glorys12_data_on_fly_inp(
     tgt = (
         xr.open_dataset(tgt_path)[tgt_var]
         .isel(isel)
-        .rename(latitude='lat', longitude='lon')
+        # .rename(latitude='lat', longitude='lon')
     )
     inp = (
         xr.open_dataset(inp_path)[inp_var]
         .isel(isel)
-        .rename(latitude='lat', longitude='lon')
+        # .rename(latitude='lat', longitude='lon')
     )
 
     return tgt, inp
