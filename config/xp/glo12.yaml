@@ -12,6 +12,9 @@ datamodule:
       patch_dims: {time: 15, lat: 48, lon: 48}
       strides: {time: 1, lat: 40, lon: 40}
       domain_limits: ${domain.train}
+      noise: .03
+    val:
+      noise: .03
   dl_kw: {batch_size: 64, num_workers: 2}
 
 model:
