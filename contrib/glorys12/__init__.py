@@ -302,5 +302,9 @@ def train(trainer, dm, lit_mod, ckpt=None):
         print()
 
     start = time.time()
-    trainer.fit(lit_mod, datamodule=dm, ckpt_path=ckpt)
+    if ckpt:
+        lit_mod.load_state_dict(
+            torch.load(ckpt, weights_only=True)['state_dict']
+        )
+    trainer.fit(lit_mod, datamodule=dm)
     print(f'Durée d\'apprentissage : {time.time() - start:.3} s')
