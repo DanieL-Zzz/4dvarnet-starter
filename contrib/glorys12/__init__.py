@@ -57,11 +57,6 @@ class DistinctNormDataModule(BaseDataModule):
             mask=self.input_mask,
         )
 
-    def val_dataloader(self):
-        return torch.utils.data.DataLoader(
-            self.val_ds, shuffle=False, batch_size=1, num_workers=1,
-        )
-
 
 class LazyXrDataset(torch.utils.data.Dataset):
     def __init__(
