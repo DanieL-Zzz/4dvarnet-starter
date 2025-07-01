@@ -173,6 +173,7 @@ class Lit4dVarNetIgnoreNaN(Lit4dVarNet):
             kwargs.pop('train_weight', 50),
             kwargs.pop('train_weight_grad', 1000),
             kwargs.pop('train_weight_prior', 1.),
+            kwargs.pop('train_weight_laplacian', 1.),
         )
         super().__init__(*args, **kwargs)
 
@@ -218,10 +219,23 @@ class Lit4dVarNetIgnoreNaN(Lit4dVarNet):
             on_epoch=True,  # sync_dist=True,
         )
 
+        lap_reg = torch.nanmean(
+            torch.sqrt(
+                1e-6 + kfilts.laplacian(
+                    out, kernel_size=3, border_type='constant',
+                )**2
+            ).where(~torch.isnan(batch.input), torch.nan)
+        )
+        self.log(
+            f'{phase}_Lloss', lap_reg, prog_bar=False, on_step=False,
+            on_epoch=True,  # sync_dist=True,
+        )
+
         training_loss = (
             self.train_weights[0] * loss
             + self.train_weights[1] * grad_loss
             + self.train_weights[2] * prior_cost
+            + self.train_weights[3] * lap_reg
         )
         return training_loss, out
 
