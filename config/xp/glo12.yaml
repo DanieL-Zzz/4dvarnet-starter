@@ -31,7 +31,7 @@ model:
     lr: 3e-4
   solver:
     _target_: src.models.GradSolver
-    n_step: 15
+    n_step: 10
     prior_cost:
       downsamp: null
 
